@@ -1,0 +1,316 @@
+---
+title: "Untitled"
+subtitle: "tbd"
+author: "Mackenzie Qu"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+abstract: |
+  |First Second Third Forth
+output: 
+  bookdown::pdf_document2:
+    citation_package: natbib
+bibliography: reference.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+#### Preamble ####
+# Purpose: Prepare and clean the survey data downloaded from []
+# Author: Huining Qu
+# Data: 26 October 2020
+# Contact: mackenzie.qu@mail.utoronto.ca
+# License: MIT
+# Pre-requisites: 
+# - Need to have downloaded the data from X and save the folder that you're 
+# interested in to inputs/data 
+# - Don't forget to gitignore it!
+
+
+#### Workspace setup ####
+library(haven)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(usmap)
+# Read in the raw data (You might need to change this if you use a different dataset)
+raw_data <- read_dta("ns20200625/ns20200625.dta")
+# Add the labels
+raw_data <- labelled::to_factor(raw_data)
+# Just keep some variables
+reduced_data <- 
+  raw_data %>% 
+  select(interest,
+         registration,
+         vote_2016,
+         vote_intention,
+         vote_2020,
+         trump_biden,
+         ideo5,
+         employment,
+         foreign_born,
+         gender,
+         census_region,
+         hispanic,
+         race_ethnicity,
+         household_income,
+         education,
+         state,
+         age)
+
+
+#### Clean Up ####
+# make age group "18-29", "30-39", "40-49", "50-59", "60+"
+cleaned_data <- reduced_data %>%
+  mutate(age_group = case_when(
+    age >= 60 ~ 60,
+    age >= 50 & age <= 59 ~ 50,
+    age >= 40 & age <= 49 ~ 40,
+    age >= 30 & age <= 39 ~ 30,
+    age >= 18 & age <= 29 ~ 18,
+  )
+           )
+
+# removes observation who will not vote or not eligible to vote
+cleaned_data<-cleaned_data[!(cleaned_data$vote_intention
+                           =="No, I will not vote but I am eligible" &
+                             cleaned_data$vote_intention
+                           =="No, I am not eligible to vote"&
+                             cleaned_data$vote_intention
+                           =="Not sure" &
+                             cleaned_data$vote_intention
+                           =="NA's"),]
+
+# clean up trump_biden variable by grouping NA and simplifying name
+cleaned_data<- cleaned_data%>%
+  mutate_at(vars(trump_biden), .funs = 
+              funs(case_when(
+                .== "Joe Biden" ~ "Biden",
+                .== "Donald Trump" ~ "Trump",
+                .== "Dont Know" ~ "NA",
+                .== "NA's" ~ "NA"
+              )))
+
+# create 2 variables "vote_trump" and "vote_biden"
+cleaned_data<- cleaned_data%>%
+  mutate(vote_trump = ifelse(trump_biden=="Trump",1,0))
+
+cleaned_data<- cleaned_data%>%
+  mutate(vote_biden = ifelse(trump_biden=="Biden",1,0))
+
+# name matcher unifies the state name in 2 datasets. 
+names_matcher <- tibble(state_name = state.name, state = state.abb)
+cleaned_data<-
+  cleaned_data%>%
+  left_join(names_matcher)
+
+# group hispanic to binary
+cleaned_data<-cleaned_data%>%
+  mutate(is_hispanic = ifelse(hispanic=="Not Hispanic", "Not Hispanic", "Hispanic"))
+
+# remove all na contained in Biden trump for later modeling 
+cleaned_data<-cleaned_data%>%
+  drop_na(trump_biden)
+
+# clean vote_2016
+cleaned_data<- cleaned_data%>%
+  mutate_at(vars(vote_2016), .funs = 
+              funs(case_when(
+                .== "Hillary Clinton" ~ "Hillary Clinton",
+                .== "Donald Trump" ~ "Donald Trump",
+                .== "Gary Johnson" ~ "Others",
+                .== "Jill Stein" ~ "Others",
+                .== "Someone else:" ~ "Others",
+                .== "Did not vote, but was eligible" ~ "Others",
+                .== "Was not eligible to vote" ~ "Others",
+                .== "Don't recall" ~ "Others"
+              )))
+
+# clean race_ethnicity
+cleaned_data<-cleaned_data%>%
+  mutate_at(vars(race_ethnicity), .funs = 
+              funs(case_when(
+                .== "White" ~ "White",
+                .== "Black, or African American" ~ "African American",
+                .== "American Indian or Alaska Native" ~ "Native American",
+                .== "Asian (Asian Indian)" ~ "Other Asian or Pacific Islander",
+                .== "Asian (Chinese)" ~ "Asian(Chinese or Japanese)",
+                .== "Asian (Filipino)" ~ "Other Asian or Pacific Islander",
+                .== "Asian (Japanese)" ~ "Asian(Chinese or Japanese)",
+                .== "Asian (Korean)" ~ "Other Asian or Pacific Islander",
+                .== "Asian (Vietnamese)" ~ "Other Asian or Pacific Islander",
+                .== "Asian (Other)" ~ "Other Asian or Pacific Islander",
+                .== "Pacific Islander (Native Hawaiian)" ~ "Other Asian or Pacific Islander",
+                .== "Pacific Islander (Guamanian)" ~ "Other Asian or Pacific Islander",
+                .== "Pacific Islander (Samoan)" ~ "Other Asian or Pacific Islander",
+                .== "Pacific Islander (Other)" ~ "Other Asian or Pacific Islander",
+                .== "Some other race" ~ "Others"
+              )))
+
+#clean education into "less than high school", "high school diploma", 
+#"some college", "Associate Degree", "College Degree(such as B.A., B.S.)", 
+#"some graduate", "Masters degree", "Doctorate degree"
+cleaned_data<-cleaned_data%>%
+  mutate_at(vars(education), .funs = 
+              funs(case_when(
+                .=="3rd Grade or less"~"less than highschool",
+                .=="Middle School - Grades 4 - 8"~"less than highschool",
+                .=="Completed some high school"~"less than highschool",
+                .=="High school graduate"~"highschool diploma",
+                .=="Other post high school vocational training"~"some college",
+                .=="Completed some college, but no degree"~"some college",
+                .=="Associate Degree"~"Associate Degree",
+                .=="College Degree (such as B.A., B.S.)"~"College Degree(such as B.A., B.S.)",
+                .=="Completed some graduate, but no degree"~"some graduate",
+                .=="Masters degree"~"Masters degree",
+                .=="Doctorate degree"~"Doctorate degree",
+              )))
+
+#clean employment
+
+```
+
+```{r Vote Intention, fig.cap="Vote intention 2020", fig.dim=c(5,3), echo=FALSE}
+#Plot Biden Trump expected votes
+cleaned_data%>%
+  ggplot(aes(y=trump_biden, fill = trump_biden))+
+  geom_bar(stat="count", width = 0.6)+
+  scale_x_continuous(name = "Vote count", 
+                     breaks = seq(0,3500, 500))+
+  ylab("Vote Intention")+
+  scale_fill_manual(values=c("Biden"= "steelblue3","Trump"= "lightcoral"))+
+  theme_minimal()
+```
+
+```{r election forcast, fig.cap="Election forcast by States", fig.dim=c(5,3), echo = FALSE}
+#create data frame containing the frequency of biden/trump's votes of each state
+state_vote<-as.data.frame(table(cleaned_data$trump_biden, cleaned_data$state_name))
+#create new data frame
+election_forcast<-data.frame(stringsAsFactors = FALSE)
+#compare trump/biden's vote for each state, bind the person with majority vote 
+#in the new data frame created. 
+for (i in seq(1,dim(state_vote)[1],2)){
+  if (state_vote$Freq[i] > state_vote$Freq[i+1]){
+    election_forcast<-rbind(election_forcast,
+                            c(as.character(state_vote$Var1[i]), 
+                              as.character(state_vote$Var2[i])),
+                            stringsAsFactors = FALSE)
+  }
+  else {
+    election_forcast<-rbind(election_forcast,
+                            c(as.character(state_vote$Var1[i+1]), 
+                              as.character(state_vote$Var2[i+1])),
+                            stringsAsFactors = FALSE)
+  }
+}
+#change data frame variable names
+names(election_forcast)[1]<-"vote"
+names(election_forcast)[2]<-"state"
+#use usmap to graph the new data, visualise the person with majority vote each state. 
+plot_usmap(data=election_forcast, values = "vote")+
+  scale_fill_manual(values = c("steelblue3", "lightcoral"))+
+  labs(title = "Election Forcast by States", fill = "Vote")
+```
+
+
+```{r Stance, fig.cap="Vote intention by political stance", fig.dim=c(5,3), echo=FALSE}
+ggplot(cleaned_data, aes(x=ideo5, fill=trump_biden))+
+  geom_bar(alpha = 0.8)+
+  facet_wrap(~trump_biden, ncol=1)+
+  coord_flip()+
+  theme_minimal()+
+  ylab("Vote Count")+
+  xlab("Political Stance")+
+  scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
+```
+
+```{r Vote2016, fig.cap="Vote intention by 2016 vote", fig.dim=c(5,3), echo=FALSE}
+ggplot(cleaned_data, aes(x=vote_2016, fill=trump_biden))+
+  geom_bar(alpha = 0.8)+
+  facet_wrap(~trump_biden, ncol=1)+
+  coord_flip()+
+  theme_minimal()+
+  ylab("Vote Count")+
+  xlab("2016 Vote")+
+  scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
+```
+
+```{r Gender, fig.cap="Vote intention by gender", fig.dim=c(5,3), echo=FALSE}
+ggplot(cleaned_data, aes(x=gender, fill=trump_biden))+
+  geom_bar(alpha = 0.8)+
+  facet_wrap(~trump_biden, ncol=1)+
+  coord_flip()+
+  theme_minimal()+
+  ylab("Gender")+
+  xlab("2016 Vote")+
+  scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
+```
+
+```{r race, fig.cap="Vote intention by race", fig.dim=c(5,3), echo = FALSE}
+ggplot(cleaned_data, aes(x=race_ethnicity, fill=trump_biden))+
+  geom_bar(alpha = 0.8)+
+  facet_wrap(~trump_biden, ncol=1)+
+  coord_flip()+
+  theme_minimal()+
+  ylab("Vote Count")+
+  xlab("race")+
+  scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
+```
+
+```{r hispanic, fig.cap="Vote intention by hispanic", fig.dim=c(5,3), echo = FALSE}
+ggplot(cleaned_data, aes(x=is_hispanic, fill=trump_biden))+
+  geom_bar(alpha = 0.8)+
+  facet_wrap(~trump_biden, ncol=1)+
+  coord_flip()+
+  theme_minimal()+
+  ylab("Vote Count")+
+  xlab("Hispanic")+
+  scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
+```
+
+
+```{r age, fig.cap="Vote intention by age", fig.dim=c(5,3), echo = FALSE}
+ggplot(cleaned_data, aes(x=as.factor(age_group), fill=trump_biden))+
+  geom_bar(alpha = 0.8)+
+  facet_wrap(~trump_biden, ncol=1)+
+  coord_flip()+
+  theme_minimal()+
+  ylab("Vote Count")+
+  xlab("Age Group")+
+  scale_x_discrete(labels = c("18~29","30~39", "40~49","50~59","60+"))+
+  scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
+```
+
+```{r education, fig.cap="Vote intention by education", fig.dim=c(5,3), echo=FALSE}
+ggplot(cleaned_data, aes(x=education, fill=trump_biden))+
+  geom_bar(alpha = 0.8)+
+  facet_wrap(~trump_biden, ncol=1)+
+  coord_flip()+
+  theme_minimal()+
+  ylab("Vote Count")+
+  xlab("education")+
+  scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
+```
+
+```{r household income, fig.cap="Vote intention by household income", fig.dim=c(5,3), echo=FALSE}
+ggplot(cleaned_data, aes(x=household_income, fill=trump_biden))+
+  geom_bar(alpha = 1)+
+  facet_wrap(~trump_biden, ncol=1)+
+  coord_flip()+
+  theme_minimal()+
+  ylab("Vote Count")+
+  xlab("household income")+
+  scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
+```
+
+```{r employment, fig.cap="Vote intention bt employment", fig.dim=c(5,3), echo=FALSE}
+ggplot(data = subset(cleaned_data, !is.na(employment)), aes(x=employment, fill=trump_biden))+
+  geom_bar(alpha = 0.8)+
+  facet_wrap(~trump_biden, ncol=1)+
+  coord_flip()+
+  theme_minimal()+
+  ylab("Vote Count")+
+  xlab("employment")+
+  scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
+```
+
+
