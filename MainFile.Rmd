@@ -1,0 +1,26 @@
+---
+title: "MainFile"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Intro
+
+
+# Data (Survey)
+
+
+# Data (Stratified)
+
+
+# Model
+
+
+# Results
+
+
+
+# Discussion
