@@ -17,7 +17,7 @@ library(tidyverse)
 # raw_data <- read_dta("Data/usa_00002.dta")
 
 # Local Computer:
-raw_data <- read_dta("inputs/data/usa_00003.dta")
+raw_data <- read_dta("Part\ 2/usa_00003.dta")
 # Add the labels
 raw_data <- labelled::to_factor(raw_data)
 
@@ -181,7 +181,7 @@ reduced_data_18 <- reduced_data_18 %>% mutate(race_ethnicity = case_when(race ==
                                                                          TRUE ~ "Other"))
 
 ### Stratified count
-cleaned_data <- 
+cleaned_data_strat <- 
   reduced_data_18 %>% 
   select(sex, 
          age,
@@ -193,7 +193,7 @@ cleaned_data <-
          employment,
          household_income)
 
-out2 <- cleaned_data %>%
+out2 <- cleaned_data_strat %>%
   group_by(sex, 
            age_group,
            race_ethnicity, 
@@ -204,4 +204,4 @@ out2 <- cleaned_data %>%
            household_income)%>% 
   summarise(count = n()) 
 
-summary(cleaned_data)         
+summary(cleaned_data_strat)         
