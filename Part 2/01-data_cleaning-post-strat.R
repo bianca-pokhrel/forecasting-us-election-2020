@@ -13,7 +13,11 @@
 library(haven)
 library(tidyverse)
 # Read in the raw data. 
-raw_data <- read_dta("inputs/data/usa_00002.dta")
+# Rstudio:
+# raw_data <- read_dta("Data/usa_00002.dta")
+
+# Local Computer:
+# raw_data <- read_dta("inputs/data/usa_00002.dta")
 # Add the labels
 raw_data <- labelled::to_factor(raw_data)
 
