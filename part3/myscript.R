@@ -28,7 +28,7 @@
 # install.packages("lmerTest")
 # install.packages("haven")
 # install.packages("RColorBrewer")
-
+# install.packages("rstanarm")
 library(tidyverse)
 library(labelled)
 library(dplyr)
@@ -38,11 +38,10 @@ library(foreign)
 library(arm)
 library(brms)
 library(effects)
-library(lme4)
 library(haven)
 library(lmerTest)
 library(RColorBrewer)
-
+library(rstanarm)
 #### create some simulated data ####
 
 size <- 6479
@@ -131,14 +130,14 @@ plot(OLS_model)
 #clearly there's something else going on... spoiler- looks like it's logistic regression
 
 log_fit_full <- glm(trump_biden ~ (gender) + (is_hispanic)
-                   + (race_ethnicity) + as.factor(household_income) + 
-                  as.factor(education) + state + age, 
+                   + (race_ethnicity) + factor(household_income) + 
+                  factor(education) + factor(state) + age, 
                data = cleaned_data,
                family = binomial(link = "logit")
                )
 summary(log_fit_full)
 # ok see what's up
-broom::tidy(log_fit1)
+broom::tidy(log_fit_full)
 layout(matrix(c(1,2,3,4),2,2))
 plot(log_fit_full, main = "FULL")
 
@@ -209,8 +208,28 @@ model_test7 <- glm(trump_biden ~ (gender) + (is_hispanic)
 anova(model_test7, log_fit_full, test="Chisq")
 summary(model_test1) 
 # need to keep education + AIC increases
+# all in all, it tells us that we should keep the full model
 
 
+
+### brm ###
+
+bayesian_model <- brm(trump_biden ~ (gender) + (is_hispanic)
+                       + (race_ethnicity) + factor(household_income) + 
+                         factor(education) + factor(state) + factor(age),
+                       family = binomial(link = "logit"),
+                       data = cleaned_data,
+                       chain = 2)
+print(bayesian_model)
+
+# FROM THE TEXTBOOK: by using post-stratification, we are assuming that data are a random sample from some well-defined population
+# also textbook says that for a well defined population like this, in political polls, we can use default priors and assume that having a 
+# somewhat. prior doesn't really help us in this case- thus can use non-informative priors or the default weak priors that stan provides
+# additionally, due to the large sample size we are using, we are able to 'ignore' priors as they will be overtaken by the likelihood
+# function. Lastly, reference all of the other articles that find election models and use them as research into why we can use default priors
+
+
+summary(bayesian_model)
 ### apply trained model to post-strat data ###
 
 
