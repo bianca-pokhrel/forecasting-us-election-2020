@@ -17,7 +17,8 @@ library(tidyverse)
 # raw_data <- read_dta("Data/usa_00002.dta")
 
 # Local Computer:
-raw_data <- read_dta("Part\ 2/usa_00003.dta")
+# raw_data <- read_dta("Part\ 2/usa_00003.dta")
+raw_data <- read_dta("inputs/data/usa_00003.dta")
 # Add the labels
 raw_data <- labelled::to_factor(raw_data)
 
@@ -25,7 +26,6 @@ raw_data <- labelled::to_factor(raw_data)
 # this depending on your interests)
 names(raw_data)
 
-#TODO: Get dataset with citizen staus
 reduced_data <- 
   raw_data %>% 
   select(region,
@@ -39,6 +39,8 @@ reduced_data <-
          educd,
          empstatd,
          ftotinc)
+reduced_data <- rename(reduced_data, gender = sex)
+reduced_data <- rename(reduced_data, state = stateicp)
 rm(raw_data)
 
 ### race, hispanic, gender, age, state, income, education, employment
@@ -112,22 +114,14 @@ unique(reduced_data_18$ftotinc)
 
 reduced_data_18 <- reduced_data_18 %>% mutate(household_income = case_when(
   ftotinc <= 14999 ~ "Less than $14,999",
-  (14999 < ftotinc & ftotinc <= 24999) ~ "$15,000 t0 $24,999",
-  (24999 < ftotinc & ftotinc <= 29999) ~ "$25,000 to $29,999",
-  (29999 < ftotinc & ftotinc <= 34999) ~ "$30,000 to $34,999",
-  (34999 < ftotinc & ftotinc <= 39999) ~ "$35,000 to $39,999",
-  (39999 < ftotinc & ftotinc <= 44999) ~ "$40,000 to $44,999",
-  (44999 < ftotinc & ftotinc <= 49999) ~ "$45,000 to $49,999",
-  (49999 < ftotinc & ftotinc <= 54999) ~ "$50,000 to $54,999",
-  (54999 < ftotinc & ftotinc <= 59999) ~ "$55,000 to $59,999",
-  (59999 < ftotinc & ftotinc <= 64999) ~ "$60,000 to $64,999",
-  (64999 < ftotinc & ftotinc <= 69999) ~ "$65,000 to $69,999",
-  (69999 < ftotinc & ftotinc <= 74999) ~ "$70,000 to $74,999",
-  (74999 < ftotinc & ftotinc <= 79999) ~ "$75,000 to $79,999",
-  (79999 < ftotinc & ftotinc <= 84999) ~ "$80,000 to $84,999",
-  (84999 < ftotinc & ftotinc <= 89999) ~ "$85,000 to $89,999",
-  (89999 < ftotinc & ftotinc <= 94999) ~ "$90,000 to $94,999",
-  (94999 < ftotinc & ftotinc <= 99999) ~ "$95,000 to $99,999",
+  (14999 < ftotinc & ftotinc <= 29999) ~ "$15,000 t0 $29,999",
+  (29999 < ftotinc & ftotinc <= 39999) ~ "$30,000 to $39,999",
+  (39999 < ftotinc & ftotinc <= 49999) ~ "$40,000 to $49,999",
+  (49999 < ftotinc & ftotinc <= 59999) ~ "$50,000 to $59,999",
+  (59999 < ftotinc & ftotinc <= 69999) ~ "$60,000 to $69,999",
+  (69999 < ftotinc & ftotinc <= 79999) ~ "$70,000 to $79,999",
+  (79999 < ftotinc & ftotinc <= 89999) ~ "$80,000 to $89,999",
+  (89999 < ftotinc & ftotinc <= 99999) ~ "$90,000 to $99,999",
   (99999 < ftotinc & ftotinc <= 124999) ~ "$100,000 to $124,999",
   124999 < ftotinc ~ "More than $125,000",
   is.na(ftotinc) ~ "Other"))
@@ -151,14 +145,14 @@ reduced_data_18 <- reduced_data_18 %>% mutate(education = case_when(
 #(is.na(educd) | educd %in% less_educ)
 
 # New col -> age group
-reduced_data_18 <- reduced_data_18 %>% mutate(age_group = case_when(as.numeric(age) < 30 ~ "Ages 18 to 29",
+reduced_data_18 <- reduced_data_18 %>% mutate(ages = case_when(as.numeric(age) < 30 ~ "Ages 18 to 29",
                                                                     (30 <= as.numeric(age) & as.numeric(age) < 45) ~ "Ages 30 to 44",
                                                                     (45 <= as.numeric(age) & as.numeric(age) < 60) ~ "Ages 45 to 59",
                                                                     TRUE ~ "Ages 60+"))
 
 # Hispanic->
 unique(reduced_data_18$hispan)
-reduced_data_18 <- reduced_data_18 %>% mutate(hispanic = case_when(hispan == "not hispanic" ~ "Not Hispanic",
+reduced_data_18 <- reduced_data_18 %>% mutate(is_hispanic = case_when(hispan == "not hispanic" ~ "Not Hispanic",
                                                                    TRUE ~ "Hispanic"))
 
 # Emploment-> armed forces grouped
@@ -179,29 +173,40 @@ reduced_data_18 <- reduced_data_18 %>% mutate(race_ethnicity = case_when(race ==
                                                                          race == "chinese" ~ "Chinese",
                                                                          race == "japanese" ~ "Japanese",
                                                                          TRUE ~ "Other"))
+# Region
+northeast <- c("Connecticut", "Maine", "Massachusetts", "New Hampshire", "Rhode Island","Vermont", "New Jersey", "New York", "Pennsylvania")
+midwest <- c("Illinois", "Indiana", "Michigan", "Ohio", "Wisconsin", "Iowa", "Kansas", "Minnesota", "Missouri", "Nebraska", "North Dakota", "South Dakota")
+south <- c("Delaware", "Florida", "Georgia", "Maryland", "North Carolina", "South Carolina", "Virginia", "District of Columbia", "West Virginia", "Alabama", "Kentucky", "Mississippi", "Tennessee","Arkansas", "Louisiana", "Oklahoma", "Texas")
+west <- c("Arizona", "Colorado", "Idaho", "Montana", "Nevada", "New Mexico", "Utah", "Wyoming", "Alaska", "California", "Hawaii", "Oregon", "Washington")
+
+reduced_data_18 <- reduced_data_18 %>% mutate(region = case_when(is.element(state,northeast) ~ "Northeast",
+                                                                 is.element(state, midwest) ~ "Midwest",
+                                                                 is.element(state, south) ~ "South",
+                                                                 is.element(state, west) ~ "West"))
+
 
 ### Stratified count
+### Region not included bc not working rn
 cleaned_data_strat <- 
   reduced_data_18 %>% 
-  select(sex, 
-         age,
-         age_group,
+  select(gender, 
+         ages,
          race_ethnicity, 
-         hispanic,
+         is_hispanic,
          foreign_born,
          education,
          employment,
          household_income)
 
-out2 <- cleaned_data_strat %>%
-  group_by(sex, 
-           age_group,
-           race_ethnicity, 
-           hispanic,
-           foreign_born,
-           education,
-           employment,
+cleaned_data_strat <- rename(cleaned_data_strat, age = ages)
+
+cleaned_data_strat_count <- cleaned_data_strat %>%
+  group_by(gender, 
+           age,
            household_income)%>% 
   summarise(count = n()) 
 
-summary(cleaned_data_strat)         
+total <-  sum(cleaned_data_strat_count$count)
+
+cleaned_data_strat_count <- cleaned_data_strat_count %>%
+  mutate(freq = count / total)
