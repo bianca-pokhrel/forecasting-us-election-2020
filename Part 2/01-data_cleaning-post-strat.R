@@ -17,7 +17,7 @@ library(tidyverse)
 # raw_data <- read_dta("Data/usa_00002.dta")
 
 # Local Computer:
-# raw_data <- read_dta("inputs/data/usa_00002.dta")
+raw_data <- read_dta("inputs/data/usa_00003.dta")
 # Add the labels
 raw_data <- labelled::to_factor(raw_data)
 
@@ -29,6 +29,7 @@ names(raw_data)
 reduced_data <- 
   raw_data %>% 
   select(region,
+         citizen,
          stateicp,
          sex, 
          age, 
@@ -45,7 +46,8 @@ rm(raw_data)
 
 #### What's next? ####
 #Sort for age >= 18
-reduced_data_18 <- reduced_data %>% filter(as.numeric(age) > 18)
+citizens <- reduced_data %>% filter(citizen == "naturalized citizen" | citizen == "born abroad of american parents")
+reduced_data_18 <- citizens %>% filter(as.numeric(age) > 18)
 
 
 #Foreign born -> US or another country
@@ -188,6 +190,7 @@ cleaned_data <-
          hispanic,
          foreign_born,
          education,
+         employment,
          household_income)
 
 out2 <- cleaned_data %>%
