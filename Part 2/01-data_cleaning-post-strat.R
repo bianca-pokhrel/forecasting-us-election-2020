@@ -12,13 +12,14 @@
 #### Workspace setup ####
 library(haven)
 library(tidyverse)
+library(dplyr)
 # Read in the raw data. 
 # Rstudio:
 # raw_data <- read_dta("Data/usa_00002.dta")
 
 # Local Computer:
-# raw_data <- read_dta("Part\ 2/usa_00003.dta")
-raw_data <- read_dta("inputs/data/usa_00003.dta")
+raw_data <- read_dta("Part\ 2/usa_00003.dta")
+#raw_data <- read_dta("inputs/data/usa_00003.dta")
 # Add the labels
 raw_data <- labelled::to_factor(raw_data)
 
@@ -28,7 +29,7 @@ names(raw_data)
 
 reduced_data <- 
   raw_data %>% 
-  select(region,
+  dplyr::select(region,
          citizen,
          stateicp,
          sex, 
@@ -194,7 +195,7 @@ reduced_data_18 <- reduced_data_18 %>% mutate(region = ifelse(state %in% northea
 ### Region not included bc not working rn
 cleaned_data_strat <- 
   reduced_data_18 %>% 
-  select(gender, 
+  dplyr::select(gender, 
          region,
          ages,
          race_ethnicity, 
@@ -205,11 +206,16 @@ cleaned_data_strat <-
          household_income)
 
 cleaned_data_strat <- rename(cleaned_data_strat, age = ages)
-
+cleaned_data_strat <- rename(cleaned_data_strat, census_region = region)
 cleaned_data_strat_count <- cleaned_data_strat %>%
   group_by(gender, 
            age,
-           household_income)%>% 
+           household_income,
+           education,
+           is_hispanic,
+           race_ethnicity,
+           census_region
+           )%>% 
   summarise(count = n()) 
 
 total <-  sum(cleaned_data_strat_count$count)

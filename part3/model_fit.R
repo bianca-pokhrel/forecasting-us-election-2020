@@ -125,12 +125,13 @@ plot(OLS_model)
 #clearly there's something else going on... spoiler- looks like it's logistic regression
 
 log_fit_full <- glm(trump_biden ~ (gender) + (is_hispanic)
-                   + (race_ethnicity) + factor(household_income) + 
-                  factor(education) + factor(state) + age, 
+                   + factor(race_ethnicity) + factor(household_income) + 
+                  factor(education) + factor(census_region) + factor(age_group), 
                data = cleaned_data,
                family = binomial(link = "logit")
                )
 summary(log_fit_full)
+
 # ok see what's up
 broom::tidy(log_fit_full)
 layout(matrix(c(1,2,3,4),2,2))
@@ -139,10 +140,10 @@ plot(log_fit_full, main = "FULL")
 #much better!
 # now to see which variables we can drop- combo of anova + AIC
 
-#Likelihood ratio test 1- without state
+#Likelihood ratio test 1- without census region
 model_test1 <- glm(trump_biden ~ (gender) + (is_hispanic)
-                  + (race_ethnicity) + as.factor(household_income) + 
-                    as.factor(education) + age, 
+                  + factor(race_ethnicity) + factor(household_income) + 
+                    factor(education) + factor(age_group), 
                   data = cleaned_data,
                   family = binomial(link = "logit"))
 anova(model_test1, log_fit_full, test="Chisq")
@@ -151,8 +152,8 @@ summary(model_test1)
 
 #Likelihood ratio test 2- without gender
 model_test2 <- glm(trump_biden ~ (is_hispanic)
-                    + (race_ethnicity) + as.factor(household_income) + 
-                      as.factor(education) + state + age, 
+                    + factor(race_ethnicity) + factor(household_income) + 
+                      factor(education) + factor(census_region) + factor(age_group), 
                     data = cleaned_data,
                     family = binomial(link = "logit")
 )
@@ -162,8 +163,8 @@ summary(model_test2)
 
 #Likelihood ratio test 3- without is_hispanic
 model_test3 <- glm(trump_biden ~ (gender)
-                    + (race_ethnicity) + as.factor(household_income) + 
-                      as.factor(education) + state + age, 
+                    + factor(race_ethnicity) + factor(household_income) + 
+                      factor(education) + factor(census_region) + factor(age_group), 
                     data = cleaned_data,
                     family = binomial(link = "logit")
 )
@@ -173,8 +174,8 @@ summary(model_test3)
 
 #Likelihood ratio test 4- without race
 model_test4 <- glm(trump_biden ~ (gender) + (is_hispanic)
-                    + as.factor(household_income) + 
-                      as.factor(education) + state + age, 
+                    + factor(household_income) + 
+                      factor(education) + factor(census_region) + factor(age_group), 
                     data = cleaned_data,
                     family = binomial(link = "logit")
 )
@@ -185,8 +186,8 @@ summary(model_test4)
 
 #Likelihood ratio test 6- without age
 model_test6 <- glm(trump_biden ~ (gender) + (is_hispanic)
-                    + (race_ethnicity) + as.factor(household_income) + 
-                      as.factor(education) + state, 
+                    + factor(race_ethnicity) + factor(household_income) + 
+                      factor(education) + factor(census_region), 
                     data = cleaned_data,
                     family = binomial(link = "logit")
 )
@@ -196,7 +197,8 @@ summary(model_test6)
 
 #Likelihood ratio test 7- without education
 model_test7 <- glm(trump_biden ~ (gender) + (is_hispanic)
-                    + (race_ethnicity) + as.factor(household_income) + state + age, 
+                    + factor(race_ethnicity) + factor(household_income) + 
+                     factor(census_region) + factor(age_group), 
                     data = cleaned_data,
                     family = binomial(link = "logit")
 )
@@ -216,8 +218,9 @@ exp(cbind(OR = coef(log_fit_full), confint.default(log_fit_full)))
 
 # try to predict using post_strat data
 
-post_strat <- cbind(out2, predict(log_fit_full, newdata = out2, type = "link",
-                                  se = TRUE))
+post_strat <- cbind(cleaned_data_strat_count, 
+                    predict(log_fit_full, newdata = cleaned_data_strat_count, 
+                            type = "link", se = TRUE))
 post_strat <- within(post_strat, {
   pred_prob <- plogis(fit)
   LL <- plogis(fit - (1.96 * se.fit))
