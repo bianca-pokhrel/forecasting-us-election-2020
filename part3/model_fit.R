@@ -38,7 +38,7 @@ library(effects)
 library(haven)
 library(aod)
 #### create some simulated data ####
-load("Part1/survey_data.Rdata")
+load("Part1/cleaned_survey_data.Rdata")
 size <- 6479
 
 
@@ -112,8 +112,8 @@ set.seed(123)
 library(MASS)
 
 #run an OLS regression to start
-OLS_model <- lm(trump_biden ~ gender + state + is_hispanic + 
-                  race_ethnicity + household_income + education + age, 
+OLS_model <- lm(trump_biden ~ gender + state + race_ethnicity + 
+                  household_income + age, 
                 data = cleaned_data)
 broom::tidy(OLS_model)
 
@@ -124,9 +124,8 @@ plot(OLS_model)
 #mkay so definitely not good model... QQ plot is def not linear & residuals vs. fitted aren't random/independent
 #clearly there's something else going on... spoiler- looks like it's logistic regression
 
-log_fit_full <- glm(trump_biden ~ (gender) + (is_hispanic)
-                   + factor(race_ethnicity) + factor(household_income) + 
-                  factor(education) + factor(census_region) + factor(age_group), 
+log_fit_full <- glm(trump_biden ~ (gender) + factor(race_ethnicity) + 
+                      factor(household_income) + factor(census_region) + factor(age_group), 
                data = cleaned_data,
                family = binomial(link = "logit")
                )
@@ -141,9 +140,8 @@ plot(log_fit_full, main = "FULL")
 # now to see which variables we can drop- combo of anova + AIC
 
 #Likelihood ratio test 1- without census region
-model_test1 <- glm(trump_biden ~ (gender) + (is_hispanic)
-                  + factor(race_ethnicity) + factor(household_income) + 
-                    factor(education) + factor(age_group), 
+model_test1 <- glm(trump_biden ~ (gender) + 
+                  + factor(race_ethnicity) + factor(household_income) + factor(age_group), 
                   data = cleaned_data,
                   family = binomial(link = "logit"))
 anova(model_test1, log_fit_full, test="Chisq")
@@ -151,9 +149,8 @@ summary(model_test1)
 # need to keep state, AIC value also increases
 
 #Likelihood ratio test 2- without gender
-model_test2 <- glm(trump_biden ~ (is_hispanic)
-                    + factor(race_ethnicity) + factor(household_income) + 
-                      factor(education) + factor(census_region) + factor(age_group), 
+model_test2 <- glm(trump_biden ~ factor(race_ethnicity) + factor(household_income)+ 
+                     factor(census_region) + factor(age_group), 
                     data = cleaned_data,
                     family = binomial(link = "logit")
 )
@@ -161,21 +158,10 @@ anova(model_test2, log_fit_full, test="Chisq")
 summary(model_test2)
 # need to keep gender + AIC skyrockets
 
-#Likelihood ratio test 3- without is_hispanic
-model_test3 <- glm(trump_biden ~ (gender)
-                    + factor(race_ethnicity) + factor(household_income) + 
-                      factor(education) + factor(census_region) + factor(age_group), 
-                    data = cleaned_data,
-                    family = binomial(link = "logit")
-)
-anova(model_test3, log_fit_full, test="Chisq")
-summary(model_test3)
-# need to keep hispanic + very slight increase in AIC
 
-#Likelihood ratio test 4- without race
-model_test4 <- glm(trump_biden ~ (gender) + (is_hispanic)
-                    + factor(household_income) + 
-                      factor(education) + factor(census_region) + factor(age_group), 
+#Likelihood ratio test 3- without race
+model_test4 <- glm(trump_biden ~ (gender) + factor(household_income) + 
+                     factor(census_region) + factor(age_group), 
                     data = cleaned_data,
                     family = binomial(link = "logit")
 )
@@ -183,11 +169,18 @@ anova(model_test4, log_fit_full, test="Chisq")
 summary(model_test4)
 # anova checks show massive increase- definitely significant + massive increase in AIC
 
+#Likelihood ration test 4- without income
+model_test5 <- glm(trump_biden ~ (gender) + factor(race_ethnicity) + 
+                     factor(census_region) + factor(age_group), 
+                   data = cleaned_data,
+                   family = binomial(link = "logit")
+)
+anova(model_test5, log_fit_full, test="Chisq")
+summary(model_test5)
 
-#Likelihood ratio test 6- without age
-model_test6 <- glm(trump_biden ~ (gender) + (is_hispanic)
-                    + factor(race_ethnicity) + factor(household_income) + 
-                      factor(education) + factor(census_region), 
+#Likelihood ratio test 5- without age
+model_test6 <- glm(trump_biden ~ (gender) + factor(race_ethnicity) + 
+                     factor(household_income) +  factor(census_region), 
                     data = cleaned_data,
                     family = binomial(link = "logit")
 )
@@ -195,15 +188,6 @@ anova(model_test6, log_fit_full, test="Chisq")
 summary(model_test6)
 # need to keep age + AIC increases
 
-#Likelihood ratio test 7- without education
-model_test7 <- glm(trump_biden ~ (gender) + (is_hispanic)
-                    + factor(race_ethnicity) + factor(household_income) + 
-                     factor(census_region) + factor(age_group), 
-                    data = cleaned_data,
-                    family = binomial(link = "logit")
-)
-anova(model_test7, log_fit_full, test="Chisq")
-summary(model_test1) 
 # need to keep education + AIC increases
 # all in all, it tells us that we should keep the full model
 
