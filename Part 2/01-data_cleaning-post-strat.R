@@ -122,8 +122,7 @@ reduced_data_18 <- reduced_data_18 %>% mutate(household_income = case_when(
   (124999 < ftotinc & ftotinc <= 149999) ~ "$125,000 to $149,999",
   (149999 < ftotinc & ftotinc <= 174999) ~ "$150,000 to $174,999",
   (174999 < ftotinc & ftotinc <= 199999) ~ "$175,000 to $199,999",
-  (199999 < ftotinc & ftotinc <= 224999) ~ "$200,000 to $224,999",
-  249999 < ftotinc ~ "More than $225,000",
+  199999 < ftotinc ~ "More than $200,000",
   is.na(ftotinc) ~ "Other"))
 
 # Education -> Brackets
