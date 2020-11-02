@@ -36,40 +36,45 @@ library(effects)
 library(haven)
 
 load("Part1/cleaned_survey_data.Rdata")
-#source("Part\ 2/01-data_cleaning-post-strat.R")
+source("Part\ 2/01-data_cleaning-post-strat.R")
 size <- 6479
 
 
-### ok now I have the real data ###
+#### ok now I have the real data ####
 
 #create binary var
 cleaned_data$trump_biden[cleaned_data$trump_biden %in% "Trump"] <- 1
 cleaned_data$trump_biden[cleaned_data$trump_biden %in% "Biden"] <- 0
 
+cleaned_data$state_name = tolower(cleaned_data$state_name)
 #set as numeric
 #convert from chr to numeric
 cleaned_data$trump_biden = as.numeric(cleaned_data$trump_biden)
 
-### playing around with model fits ###
+# omit the NA's since model will remove them anyway
+cleaned_data = na.omit(cleaned_data)
+
+#### playing around with model fits ####
 
 set.seed(123)
 library(MASS)
 
 #run an OLS regression to start
-OLS_model <- lm(trump_biden ~ gender + factor(census_region) + factor(race_ethnicity) + 
+OLS_model <- lm(trump_biden ~ gender + factor(state_name) + factor(race_ethnicity) + 
                   factor(household_income) + factor(age_group), 
                 data = cleaned_data)
 broom::tidy(OLS_model)
 
 #plot just to see what's up... give analysis for why this definitely isn't a good model
-# layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page
-# plot(OLS_model)
+layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page
+plot(OLS_model)
 
 #mkay so definitely not good model... QQ plot is def not linear & residuals vs. fitted aren't random/independent
 #clearly there's something else going on... spoiler- looks like it's logistic regression
 
+
 log_fit_full <- glm(trump_biden ~ (gender) + factor(race_ethnicity) + 
-                      factor(household_income) + factor(census_region) + factor(age_group), 
+                      factor(household_income) + factor(state_name) + factor(age_group), 
                data = cleaned_data,
                family = binomial(link = "logit")
                )
@@ -92,7 +97,7 @@ summary(model_test1)
 
 #Likelihood ratio test 2- without gender
 model_test2 <- glm(trump_biden ~ factor(race_ethnicity) + factor(household_income)+ 
-                     factor(census_region) + factor(age_group), 
+                     factor(state_name) + factor(age_group), 
                     data = cleaned_data,
                     family = binomial(link = "logit")
 )
@@ -103,7 +108,7 @@ summary(model_test2)
 
 #Likelihood ratio test 3- without race
 model_test4 <- glm(trump_biden ~ (gender) + factor(household_income) + 
-                     factor(census_region) + factor(age_group), 
+                     factor(state_name) + factor(age_group), 
                     data = cleaned_data,
                     family = binomial(link = "logit")
 )
@@ -113,7 +118,7 @@ summary(model_test4)
 
 #Likelihood ration test 4- without income
 model_test5 <- glm(trump_biden ~ (gender) + factor(race_ethnicity) + 
-                     factor(census_region) + factor(age_group), 
+                     factor(state_name) + factor(age_group), 
                    data = cleaned_data,
                    family = binomial(link = "logit")
 )
@@ -122,7 +127,7 @@ summary(model_test5)
 
 #Likelihood ratio test 5- without age
 model_test6 <- glm(trump_biden ~ (gender) + factor(race_ethnicity) + 
-                     factor(household_income) +  factor(census_region), 
+                     factor(household_income) +  factor(state_name), 
                     data = cleaned_data,
                     family = binomial(link = "logit")
 )
@@ -142,7 +147,7 @@ confint.default(log_fit_full)
 exp(cbind(OR = coef(log_fit_full), confint.default(log_fit_full)))
 
 
-# try to predict using post_strat data
+#### try to predict using post_strat data ####
 
 # retrieve calculations for proportions of each cell by indep. var
 
@@ -160,7 +165,7 @@ race_prop <- cleaned_data_strat_count %>%
 
 region_prop <- cleaned_data_strat_count %>%
   ungroup() %>%
-  group_by(census_region) %>%
+  group_by(state_name) %>%
   mutate(prop = n/sum(n)) %>%
   ungroup()
 
@@ -224,7 +229,7 @@ colnames(region_pred) = "vote_pred"
 region_prop <- cbind(region_prop, region_pred)
 region_prop %>%
   mutate (region_predict_prop = vote_pred*prop) %>%
-  group_by(census_region) %>%
+  group_by(state_name) %>%
   summarise(vote_pred = sum(region_predict_prop)) %>%
   summarise(mean = mean(vote_pred),
             lower = quantile(vote_pred, 0.025),
@@ -243,22 +248,8 @@ income_prop %>%
             lower = quantile(vote_pred, 0.025),
             higher = quantile(vote_pred, 0.975))
 
-### 'beautiful' graphs ###
-age_prop %>% 
-  ggplot(aes(y = mean, x = forcats::fct_inorder(age_group), color = "MRP estimate")) + 
-  geom_point() +
-  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0) + 
-  ylab("Proportion of voters for Trump") + 
-  xlab("age groups in 2016") + 
-  geom_point(data = cleaned_data_strat %>% 
-               group_by(age_group) %>%
-               summarise(n = n()) %>% 
-               group_by(age_group) %>% 
-               mutate(prop = n/sum(n)), 
-             aes(age_group, prop, color = "MNCS raw data")) +
-  scale_color_manual(name = "", values = c("MRP estimate" = "black", "MNCS raw data" = "red")) + 
-  theme_bw(base_size = 14) +
-  ggtitle("Proportion of women keeping name after marriage")
+#### 'beautiful' graphs ####
+
 
 ### brm ###
 
