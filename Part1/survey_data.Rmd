@@ -47,10 +47,8 @@ reduced_data <-
          trump_biden,
          ideo5,
          gender,
-         hispanic,
          race_ethnicity,
          household_income,
-         education,
          state,
          age)
 
@@ -92,10 +90,6 @@ cleaned_data<-
   cleaned_data%>%
   left_join(names_matcher)
 
-# group hispanic to binary
-cleaned_data<-cleaned_data%>%
-  mutate(is_hispanic = ifelse(hispanic=="Not Hispanic", "Not Hispanic", "Hispanic"))
-
 # remove all na contained in Biden trump for later modeling 
 cleaned_data<-cleaned_data%>%
   drop_na(trump_biden)
@@ -135,24 +129,6 @@ cleaned_data<-cleaned_data%>%
                 .== "Some other race" ~ "Others"
               )))
 
-#clean education into "less than high school", "high school diploma", 
-#"some college", "Associate Degree", "College Degree(such as B.A., B.S.)", 
-#"some graduate", "Masters degree", "Doctorate degree"
-cleaned_data<-cleaned_data%>%
-  mutate_at(vars(education), .funs = 
-              funs(case_when(
-                .=="3rd Grade or less"~"less than highschool",
-                .=="Middle School - Grades 4 - 8"~"less than highschool",
-                .=="Completed some high school"~"less than highschool",
-                .=="High school graduate"~"highschool diploma",
-                .=="Other post high school vocational training"~"some college",
-                .=="Completed some college, but no degree"~"some college",
-                .=="Associate Degree"~"Associate Degree",
-                .=="College Degree (such as B.A., B.S.)"~"College Degree(such as B.A., B.S.)",
-                .=="Completed some graduate, but no degree"~"Completed some graduate",
-                .=="Masters degree"~"Masters Degree",
-                .=="Doctorate degree"~"Doctorate Degree",
-              )))
 
 #clean income
 cleaned_data<- cleaned_data%>%
@@ -184,12 +160,15 @@ cleaned_data<- cleaned_data%>%
                 .=="$250,000 and above"~"$250,000 and above",
                 .=="NA's"~"NA",
               )))
+
+# save cleaned_data
+saveRDS(cleaned_data, file = "cleaned_survey_data.Rdata")
 ```
 
 ```{r data preview, echo=FALSE}
-kable(head(cleaned_data[1:7]), format="latex", booktabs=TRUE) %>% 
+kable(head(cleaned_data[1:6]), format="latex", booktabs=TRUE) %>% 
   kable_styling(latex_options="scale_down")
-kable(head(cleaned_data[8:15]), format="latex", booktabs=TRUE) %>% 
+kable(head(cleaned_data[7:12]), format="latex", booktabs=TRUE) %>% 
   kable_styling(latex_options="scale_down")
 ```
 
@@ -282,17 +261,6 @@ ggplot(cleaned_data, aes(x=race_ethnicity, fill=trump_biden))+
   scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
 ```
 
-```{r hispanic, fig.cap="Vote intention by hispanic", fig.dim=c(5,3), echo = FALSE}
-ggplot(cleaned_data, aes(x=is_hispanic, fill=trump_biden))+
-  geom_bar(alpha = 0.8)+
-  facet_wrap(~trump_biden, ncol=1)+
-  coord_flip()+
-  theme_minimal()+
-  ylab("Vote Count")+
-  xlab("Hispanic")+
-  scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
-```
-
 
 ```{r age, fig.cap="Vote intention by age", fig.dim=c(5,3), echo = FALSE}
 ggplot(cleaned_data, aes(x=as.factor(age_group), fill=trump_biden))+
@@ -306,25 +274,6 @@ ggplot(cleaned_data, aes(x=as.factor(age_group), fill=trump_biden))+
   scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
 ```
 
-```{r education, fig.cap="Vote intention by education", fig.dim=c(5,3), echo=FALSE}
-ggplot(cleaned_data, aes(x=factor(education, 
-                                  levels = c("less than highschool", 
-                                             "highschool diploma",
-                                             "some college",
-                                             "Associate Degree",
-                                             "College Degree(such as B.A., B.S.)",
-                                             "Completed some graduate",
-                                             "Masters Degree", 
-                                             "Doctorate Degree")), 
-                         fill=trump_biden))+
-  geom_bar(alpha = 0.8)+
-  facet_wrap(~trump_biden, ncol=1)+
-  coord_flip()+
-  theme_minimal()+
-  ylab("Vote Count")+
-  xlab("education")+
-  scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
-```
 
 ```{r income, fig.cap="Vote intention by household income", fig.dim=c(5,3), echo=FALSE}
 # Graph household income tears for trump/biden votes. 
