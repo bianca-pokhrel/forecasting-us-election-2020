@@ -49,7 +49,7 @@ rm(raw_data)
 
 #### What's next? ####
 #Sort for age >= 18
-citizens <- reduced_data %>% filter(citizen == "naturalized citizen" | citizen == "born abroad of american parents")
+citizens <- reduced_data %>% filter(citizen == "naturalized citizen" | citizen == "born abroad of american parents") %>% filter(as.numeric(ftotinc) < 9999999)
 reduced_data_18 <- citizens %>% filter(as.numeric(age) > 18)
 
 
@@ -114,17 +114,16 @@ reduced_data_18 <- reduced_data_18 %>%
 unique(reduced_data_18$ftotinc) 
 
 reduced_data_18 <- reduced_data_18 %>% mutate(household_income = case_when(
-  ftotinc <= 14999 ~ "Less than $14,999",
-  (14999 < ftotinc & ftotinc <= 29999) ~ "$15,000 t0 $29,999",
-  (29999 < ftotinc & ftotinc <= 39999) ~ "$30,000 to $39,999",
-  (39999 < ftotinc & ftotinc <= 49999) ~ "$40,000 to $49,999",
-  (49999 < ftotinc & ftotinc <= 59999) ~ "$50,000 to $59,999",
-  (59999 < ftotinc & ftotinc <= 69999) ~ "$60,000 to $69,999",
-  (69999 < ftotinc & ftotinc <= 79999) ~ "$70,000 to $79,999",
-  (79999 < ftotinc & ftotinc <= 89999) ~ "$80,000 to $89,999",
-  (89999 < ftotinc & ftotinc <= 99999) ~ "$90,000 to $99,999",
+  ftotinc <= 24999 ~ "Less than $24,999",
+  (24999 < ftotinc & ftotinc <= 49999) ~ "$25,000 t0 $49,999",
+  (49999 < ftotinc & ftotinc <= 74999) ~ "$50,000 to $74,999",
+  (74999 < ftotinc & ftotinc <= 99999) ~ "$75,000 to $99,999",
   (99999 < ftotinc & ftotinc <= 124999) ~ "$100,000 to $124,999",
-  124999 < ftotinc ~ "More than $125,000",
+  (124999 < ftotinc & ftotinc <= 149999) ~ "$125,000 to $149,999",
+  (149999 < ftotinc & ftotinc <= 174999) ~ "$150,000 to $174,999",
+  (174999 < ftotinc & ftotinc <= 199999) ~ "$175,000 to $199,999",
+  (199999 < ftotinc & ftotinc <= 224999) ~ "$200,000 to $224,999",
+  249999 < ftotinc ~ "More than $225,000",
   is.na(ftotinc) ~ "Other"))
 
 # Education -> Brackets
