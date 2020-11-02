@@ -207,11 +207,11 @@ cleaned_data_strat <-
          employment,
          household_income)
 
-cleaned_data_strat <- rename(cleaned_data_strat, age = ages)
+cleaned_data_strat <- rename(cleaned_data_strat, age_group = ages)
 cleaned_data_strat <- rename(cleaned_data_strat, census_region = region)
 cleaned_data_strat_count <- cleaned_data_strat %>%
   group_by(gender, 
-           age,
+           age_group,
            household_income,
            education,
            is_hispanic,
