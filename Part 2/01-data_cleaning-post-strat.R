@@ -176,29 +176,30 @@ reduced_data_18 <- reduced_data_18 %>% mutate(race_ethnicity = case_when(race ==
                                                                          race == "chinese" ~ "Asian(Chinese or Japanese)",
                                                                          race == "japanese" ~ "Asian(Chinese or Japanese)",
                                                                          TRUE ~ "Others"))
-# Region
-northeast <- c("Connecticut", "Maine", "Massachusetts", "New Hampshire", "Rhode Island","Vermont", "New Jersey", "New York", "Pennsylvania")
-midwest <- c("Illinois", "Indiana", "Michigan", "Ohio", "Wisconsin", "Iowa", "Kansas", "Minnesota", "Missouri", "Nebraska", "North Dakota", "South Dakota")
-south <- c("Delaware", "Florida", "Georgia", "Maryland", "North Carolina", "South Carolina", "Virginia", "District of Columbia", "West Virginia", "Alabama", "Kentucky", "Mississippi", "Tennessee","Arkansas", "Louisiana", "Oklahoma", "Texas")
-west <- c("Arizona", "Colorado", "Idaho", "Montana", "Nevada", "New Mexico", "Utah", "Wyoming", "Alaska", "California", "Hawaii", "Oregon", "Washington")
+# # Region
+# northeast <- c("Connecticut", "Maine", "Massachusetts", "New Hampshire", "Rhode Island","Vermont", "New Jersey", "New York", "Pennsylvania")
+# midwest <- c("Illinois", "Indiana", "Michigan", "Ohio", "Wisconsin", "Iowa", "Kansas", "Minnesota", "Missouri", "Nebraska", "North Dakota", "South Dakota")
+# south <- c("Delaware", "Florida", "Georgia", "Maryland", "North Carolina", "South Carolina", "Virginia", "District of Columbia", "West Virginia", "Alabama", "Kentucky", "Mississippi", "Tennessee","Arkansas", "Louisiana", "Oklahoma", "Texas")
+# west <- c("Arizona", "Colorado", "Idaho", "Montana", "Nevada", "New Mexico", "Utah", "Wyoming", "Alaska", "California", "Hawaii", "Oregon", "Washington")
+# 
+# northeast <- lapply(northeast, tolower)
+# midwest <- lapply(midwest, tolower)
+# south <- lapply(south, tolower)
+# west <- lapply(west, tolower)
+# 
+# reduced_data_18 <- reduced_data_18 %>% mutate(region = ifelse(state %in% northeast, "Northeast",
+#                                                               ifelse(state %in% midwest, "Midwest",
+#                                                                      ifelse(state %in% south, "South",
+#                                                                             ifelse(state %in% west, "West", "NA")))))
 
-northeast <- lapply(northeast, tolower)
-midwest <- lapply(midwest, tolower)
-south <- lapply(south, tolower)
-west <- lapply(west, tolower)
-
-reduced_data_18 <- reduced_data_18 %>% mutate(region = ifelse(state %in% northeast, "Northeast",
-                                                              ifelse(state %in% midwest, "Midwest",
-                                                                     ifelse(state %in% south, "South",
-                                                                            ifelse(state %in% west, "West", "NA")))))
-
+reduced_data_18 <- filter(reduced_data_18, state != "district of columbia")
 
 ### Stratified count
 ### Region not included bc not working rn
 cleaned_data_strat <- 
   reduced_data_18 %>% 
   dplyr::select(gender, 
-         region,
+         state,
          ages,
          race_ethnicity, 
          is_hispanic,
@@ -208,13 +209,14 @@ cleaned_data_strat <-
          household_income)
 
 cleaned_data_strat <- rename(cleaned_data_strat, age_group = ages)
-cleaned_data_strat <- rename(cleaned_data_strat, census_region = region)
+cleaned_data_strat <-rename(cleaned_data_strat, state_name = state)
 cleaned_data_strat_count <- cleaned_data_strat %>%
-  group_by(gender, 
+  group_by( gender,
            age_group,
            household_income,
            race_ethnicity,
-           census_region
+           state_name
            )%>% 
   summarise(n = n()) 
 
+save(cleaned_data_strat_count, file = "post-strat")
