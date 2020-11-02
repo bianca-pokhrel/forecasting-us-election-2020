@@ -18,8 +18,8 @@ library(dplyr)
 # raw_data <- read_dta("Data/usa_00002.dta")
 
 # Local Computer:
-raw_data <- read_dta("Part\ 2/usa_00003.dta")
-#raw_data <- read_dta("inputs/data/usa_00003.dta")
+#raw_data <- read_dta("Part\ 2/usa_00003.dta")
+raw_data <- read_dta("inputs/data/usa_00003.dta")
 # Add the labels
 raw_data <- labelled::to_factor(raw_data)
 
@@ -225,14 +225,12 @@ income_pie <- ggplot(cleaned_data_strat, aes(x=factor(1), fill=household_income)
   coord_polar("y") 
 
 
-cleaned_data_strat <- rename(cleaned_data_strat, age_group = ages)
-cleaned_data_strat <- rename(cleaned_data_strat, census_region = region)
 cleaned_data_strat_count <- cleaned_data_strat %>%
   group_by(gender, 
            ages,
            household_income,
            race_ethnicity,
-           census_region
+           state
            )%>% 
   summarise(n = n()) 
 
