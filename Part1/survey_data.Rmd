@@ -57,10 +57,10 @@ reduced_data <-
 # make age group "18-29", "30-44", "45-59", "60+"
 cleaned_data <- reduced_data %>%
   mutate(age_group = case_when(
-    age >= 60 ~ 60,
-    age >= 45 & age <= 59 ~ 50,
-    age >= 30 & age <= 44 ~ 40,
-    age >= 18 & age <= 29 ~ 18,
+    age >= 60 ~ "60+",
+    age >= 45 & age <= 59 ~ "45 to 59",
+    age >= 30 & age <= 44 ~ "30 to 44",
+    age >= 18 & age <= 29 ~ "18 to 29",
   )
            )
 
@@ -162,7 +162,7 @@ cleaned_data<- cleaned_data%>%
               )))
 
 # save cleaned_data
-saveRDS(cleaned_data, file = "cleaned_survey_data.Rdata")
+save(cleaned_data, file = "cleaned_survey_data.Rdata")
 ```
 
 ```{r data preview, echo=FALSE}
