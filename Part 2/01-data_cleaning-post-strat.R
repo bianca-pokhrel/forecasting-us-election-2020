@@ -179,10 +179,15 @@ midwest <- c("Illinois", "Indiana", "Michigan", "Ohio", "Wisconsin", "Iowa", "Ka
 south <- c("Delaware", "Florida", "Georgia", "Maryland", "North Carolina", "South Carolina", "Virginia", "District of Columbia", "West Virginia", "Alabama", "Kentucky", "Mississippi", "Tennessee","Arkansas", "Louisiana", "Oklahoma", "Texas")
 west <- c("Arizona", "Colorado", "Idaho", "Montana", "Nevada", "New Mexico", "Utah", "Wyoming", "Alaska", "California", "Hawaii", "Oregon", "Washington")
 
-reduced_data_18 <- reduced_data_18 %>% mutate(region = case_when(is.element(state,northeast) ~ "Northeast",
-                                                                 is.element(state, midwest) ~ "Midwest",
-                                                                 is.element(state, south) ~ "South",
-                                                                 is.element(state, west) ~ "West"))
+northeast <- lapply(northeast, tolower)
+midwest <- lapply(midwest, tolower)
+south <- lapply(south, tolower)
+west <- lapply(west, tolower)
+
+reduced_data_18 <- reduced_data_18 %>% mutate(region = ifelse(state %in% northeast, "Northeast",
+                                                              ifelse(state %in% midwest, "Midwest",
+                                                                     ifelse(state %in% south, "South",
+                                                                            ifelse(state %in% west, "West", "NA")))))
 
 
 ### Stratified count
@@ -190,6 +195,7 @@ reduced_data_18 <- reduced_data_18 %>% mutate(region = case_when(is.element(stat
 cleaned_data_strat <- 
   reduced_data_18 %>% 
   select(gender, 
+         region,
          ages,
          race_ethnicity, 
          is_hispanic,
