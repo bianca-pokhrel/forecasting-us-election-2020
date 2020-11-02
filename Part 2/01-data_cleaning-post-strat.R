@@ -234,9 +234,5 @@ cleaned_data_strat_count <- cleaned_data_strat %>%
            race_ethnicity,
            census_region
            )%>% 
-  summarise(count = n()) 
+  summarise(n = n()) 
 
-total <-  sum(cleaned_data_strat_count$count)
-
-cleaned_data_strat_count <- cleaned_data_strat_count %>%
-  mutate(prop = count / total)
