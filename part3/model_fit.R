@@ -202,14 +202,27 @@ exp(cbind(OR = coef(log_fit_full), confint.default(log_fit_full)))
 
 # try to predict using post_strat data
 
-post_strat <- cbind(cleaned_data_strat_count, 
-                    predict(log_fit_full, newdata = cleaned_data_strat_count, 
-                            type = "link", se = TRUE))
-post_strat <- within(post_strat, {
-  pred_prob <- plogis(fit)
-  LL <- plogis(fit - (1.96 * se.fit))
-  UL <- plogis(fit + (1.96 * se.fit))
-})
+gender_prop <- cleaned_data_strat_count %>%
+  group_by(gender) %>%
+  ungroup()
+
+race_prop <- cleaned_data_strat_count %>%
+  group_by(race_ethnicity) %>%
+  ungroup()
+
+region_prop <- cleaned_data_strat_count %>%
+  group_by(census_region) %>%
+  ungroup()
+
+income_prop <- cleaned_data_strat_count %>%
+  group_by(household_income) %>%
+  ungroup()
+
+age_prop <- cleaned_data_strat_count %>%
+  group_by(age_group) %>%
+  ungroup()
+
+post_strat_gender <- predict(log_fit_full, newdata = gender_prop, type = "response")
 
 
 

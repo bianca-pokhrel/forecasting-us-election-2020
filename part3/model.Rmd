@@ -1,0 +1,75 @@
+---
+title: "Modelling the data"
+subtitle: "tbd"
+author: "Bianca POkhrel"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+abstract: |
+  |First Second Third Forth
+output: 
+  bookdown::pdf_document2:
+    citation_package: natbib
+bibliography: reference.bib
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+# install.packages("aod")
+library(tidyverse)
+library(labelled)
+library(dplyr)
+library(ggplot2)
+library(readxl)
+library(foreign)
+library(arm)
+library(brms)
+library(effects)
+library(haven)
+library(aod)
+
+load("Part1/cleaned_survey_data.Rdata")
+
+#create binary var
+cleaned_data$trump_biden[cleaned_data$trump_biden %in% "Trump"] <- 1
+cleaned_data$trump_biden[cleaned_data$trump_biden %in% "Biden"] <- 0
+
+#set as numeric
+#convert from chr to numeric
+cleaned_data$trump_biden = as.numeric(cleaned_data$trump_biden)
+```
+
+## Model
+
+Our primary goal in this report is to be able to cast predictions on the upcoming U.S.
+presidential election. The importance of forecasting the 2020 election cannot be understated after the fiasco of the 
+2016 election results. In this section we will talk about our model development process and how we decided to use a 
+logistic regression using the glm() function in R.
+
+As discussed in the previous data section, we have taken particular interest in the following variables:
+- gender
+- race/ethnicity
+- household income
+- census region
+- age group
+
+We have picked gender as a variable of interest as from the 2016 election, the percentage of women who voted for Trump was 42% (https://www.pewresearch.org/fact-tank/2016/11/09/behind-trumps-victory-divisions-by-race-gender-education/). We would like to see how over the course of his adminstration, that percentage has potentially changed.
+
+Secondly, we have picked race/ethnicity as a variable of interest. In the current climate, the U.S. remains extremely racially divided. Since 2016 we have witnessed the White House's response to police brutality, xenophobia, islamophobia, etc. We would like to further investigate how much of a role race plays in whether Trump or Biden gets a vote.
+
+Thirdly, we have chosen household income as a variable of interest. Tax breaks and "taxing the rich" is a common rhetoric used by politicians. We want to know who this rhetoric is affecting and how one's income bracket affects who they vote for. 
+
+Fourth, we have chosen the census region. Historically, regions are considered either 'red' or blue.' In election polling, an important variable to keep an eye on are the regions that may be 'swing' regions. For example, southern states such as Florida have been known to be a crucial state that can 'swing' the election spontaenously. Thus, we want to determine the significance of what regions people have answered this survey from and how crucial it is to forecasting an election.
+
+Lastly, we have chosen age groups as a variable of interest. Since the 2016 election, there has been a disparity between the younger and older populations. 
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
