@@ -175,7 +175,7 @@ model_test5 <- glm(trump_biden ~ (gender) + factor(race_ethnicity) +
                    data = cleaned_data,
                    family = binomial(link = "logit")
 )
-anova(model_test5, log_fit_full, test="Chisq")
+#anova(model_test5, log_fit_full, test="Chisq")
 summary(model_test5)
 
 #Likelihood ratio test 5- without age
@@ -202,27 +202,39 @@ exp(cbind(OR = coef(log_fit_full), confint.default(log_fit_full)))
 
 # try to predict using post_strat data
 
+# retrieve calculations for proportions of each cell by indep. var
+
 gender_prop <- cleaned_data_strat_count %>%
+  ungroup() %>%
   group_by(gender) %>%
+  mutate(prop = n/sum(n)) %>%
   ungroup()
 
 race_prop <- cleaned_data_strat_count %>%
+  ungroup() %>%
   group_by(race_ethnicity) %>%
+  mutate(prop = n/sum(n)) %>%
   ungroup()
 
 region_prop <- cleaned_data_strat_count %>%
+  ungroup() %>%
   group_by(census_region) %>%
+  mutate(prop = n/sum(n)) %>%
   ungroup()
 
 income_prop <- cleaned_data_strat_count %>%
+  ungroup() %>%
   group_by(household_income) %>%
+  mutate(prop = n/sum(n)) %>%
   ungroup()
 
 age_prop <- cleaned_data_strat_count %>%
+  ungroup %>%
   group_by(age_group) %>%
+  mutate(prop = n/sum(n)) %>%
   ungroup()
 
-post_strat_gender <- predict(log_fit_full, newdata = gender_prop, type = "response")
+# predictions based on each variable
 
 
 
