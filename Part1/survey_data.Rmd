@@ -30,10 +30,11 @@ library(haven)
 library(tidyverse)
 library(dplyr)
 library(ggplot2)
-library(tidyr)
-library(usmap)
-library(knitr)
-library(kableExtra)
+library(tidyr) 
+library(usmap) # make beautiful us state vote plot
+library(knitr) # Make beautiful Latex table
+library(kableExtra) # scale down tables
+library(cowplot) # fit multiple graph on one page
 # Read in the raw data (You might need to change this if you use a different dataset)
 raw_data <- read_dta("ns20200625/ns20200625.dta")
 # Add the labels
@@ -169,7 +170,8 @@ save(cleaned_data, file = "cleaned_survey_data.Rdata")
 ```{r data preview, echo=FALSE}
 kable(head(cleaned_data[1:6]), format="latex", booktabs=TRUE) %>% 
   kable_styling(latex_options="scale_down")
-kable(head(cleaned_data[7:12]), format="latex", booktabs=TRUE) %>% 
+
+kable(head(cleaned_data[7:13]), format="latex", booktabs=TRUE) %>% 
   kable_styling(latex_options="scale_down")
 ```
 
@@ -177,7 +179,7 @@ kable(head(cleaned_data[7:12]), format="latex", booktabs=TRUE) %>%
 
 ```{r Vote, fig.cap="Vote intention 2020", fig.dim=c(5,3), echo=FALSE}
 #Plot Biden Trump expected votes
-cleaned_data%>%
+vote<-cleaned_data%>%
   ggplot(aes(y=trump_biden, fill = trump_biden))+
   geom_bar(stat="count", width = 0.6)+
   scale_x_continuous(name = "Vote count", 
@@ -212,14 +214,14 @@ for (i in seq(1,dim(state_vote)[1],2)){
 names(election_forcast)[1]<-"vote"
 names(election_forcast)[2]<-"state"
 #use usmap to graph the new data, visualize the person with majority vote each state. 
-plot_usmap(data=election_forcast, values = "vote")+
+vote_state <- plot_usmap(data=election_forcast, values = "vote")+
   scale_fill_manual(values = c("steelblue3", "lightcoral"))+
   labs(title = "Election Forcast by States", fill = "Vote")
 ```
 
 
 ```{r Stance, fig.cap="Vote intention by political stance", fig.dim=c(5,3), echo=FALSE}
-ggplot(cleaned_data, aes(x=ideo5, fill=trump_biden))+
+vote_ideo<-ggplot(cleaned_data, aes(x=ideo5, fill=trump_biden))+
   geom_bar(alpha = 0.8)+
   facet_wrap(~trump_biden, ncol=1)+
   coord_flip()+
@@ -230,7 +232,7 @@ ggplot(cleaned_data, aes(x=ideo5, fill=trump_biden))+
 ```
 
 ```{r Vote2016, fig.cap="Vote intention by 2016 vote", fig.dim=c(5,3), echo=FALSE}
-ggplot(cleaned_data, aes(x=vote_2016, fill=trump_biden))+
+vote_2016<- ggplot(cleaned_data, aes(x=vote_2016, fill=trump_biden))+
   geom_bar(alpha = 0.8)+
   facet_wrap(~trump_biden, ncol=1)+
   coord_flip()+
@@ -240,19 +242,25 @@ ggplot(cleaned_data, aes(x=vote_2016, fill=trump_biden))+
   scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
 ```
 
+```{r}
+plot_grid(vote, vote_state, vote_ideo, vote_2016, labels = "AUTO", ncol = 2)
+```
+
+
+
 ```{r Gender, fig.cap="Vote intention by gender", fig.dim=c(5,3), echo=FALSE}
-ggplot(cleaned_data, aes(x=gender, fill=trump_biden))+
+vote_gender<-ggplot(cleaned_data, aes(x=gender, fill=trump_biden))+
   geom_bar(alpha = 0.8)+
   facet_wrap(~trump_biden, ncol=1)+
   coord_flip()+
   theme_minimal()+
-  ylab("Gender")+
-  xlab("2016 Vote")+
+  ylab("Vote Count")+
+  xlab("Gender")+
   scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
 ```
 
 ```{r race, fig.cap="Vote intention by race", fig.dim=c(5,3), echo = FALSE}
-ggplot(cleaned_data, aes(x=race_ethnicity, fill=trump_biden))+
+vote_race<-ggplot(cleaned_data, aes(x=race_ethnicity, fill=trump_biden))+
   geom_bar(alpha = 0.8)+
   facet_wrap(~trump_biden, ncol=1)+
   coord_flip()+
@@ -264,7 +272,7 @@ ggplot(cleaned_data, aes(x=race_ethnicity, fill=trump_biden))+
 
 
 ```{r age, fig.cap="Vote intention by age", fig.dim=c(5,3), echo = FALSE}
-ggplot(cleaned_data, aes(x=as.factor(age_group), fill=trump_biden))+
+vote_age<-ggplot(cleaned_data, aes(x=as.factor(age_group), fill=trump_biden))+
   geom_bar(alpha = 0.8)+
   facet_wrap(~trump_biden, ncol=1)+
   coord_flip()+
@@ -279,7 +287,7 @@ ggplot(cleaned_data, aes(x=as.factor(age_group), fill=trump_biden))+
 ```{r income, fig.cap="Vote intention by household income", fig.dim=c(5,3), echo=FALSE}
 # Graph household income tears for trump/biden votes. 
 # remove na, and levels ensures the order presented on graph
-ggplot(data = subset(cleaned_data, !is.na(household_income)), aes(x=factor(household_income, 
+vote_income<-ggplot(data = subset(cleaned_data, !is.na(household_income)), aes(x=factor(household_income, 
                                   levels = c("Less than $24,999",
                                              "$25,000 t0 $49,999",
                                              "$50,000 to $74,999",
