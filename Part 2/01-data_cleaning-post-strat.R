@@ -52,6 +52,10 @@ rm(raw_data)
 citizens <- reduced_data %>% filter(citizen == "naturalized citizen" | citizen == "born abroad of american parents") %>% filter(as.numeric(ftotinc) < 9999999)
 reduced_data_18 <- citizens %>% filter(as.numeric(age) > 18)
 
+#Consitent gender labels
+reduced_data_18 <- reduced_data_18 %>%  mutate_at(vars(gender), .funs = 
+                                                    funs(case_when(.== "male" ~ "Male",
+                                                                   .== "female" ~ "Female")))
 
 #Foreign born -> US or another country
 unique(reduced_data_18$bpl) 
