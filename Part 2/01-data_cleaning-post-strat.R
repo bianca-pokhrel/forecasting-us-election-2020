@@ -170,12 +170,12 @@ reduced_data_18 <- reduced_data_18 %>% mutate(employment = case_when(empstatd ==
 # Race -> Group 2+ races into other
 unique(reduced_data_18$race) 
 reduced_data_18 <- reduced_data_18 %>% mutate(race_ethnicity = case_when(race == "white" ~ "White",
-                                                                         race == "black/african american/negro" ~ "Black, or African American",
-                                                                         race == "other asian or pacific islander" ~ "Other asian or pacific islander",
-                                                                         race == "american indian or alaska native" ~ "American indian or alaska native",
-                                                                         race == "chinese" ~ "Chinese",
-                                                                         race == "japanese" ~ "Japanese",
-                                                                         TRUE ~ "Other"))
+                                                                         race == "black/african american/negro" ~ "African American",
+                                                                         race == "other asian or pacific islander" ~ "Other Asian or Pacific Islander",
+                                                                         race == "american indian or alaska native" ~ "Native American",
+                                                                         race == "chinese" ~ "Asian(Chinese or Japanese)",
+                                                                         race == "japanese" ~ "Asian(Chinese or Japanese)",
+                                                                         TRUE ~ "Others"))
 # Region
 northeast <- c("Connecticut", "Maine", "Massachusetts", "New Hampshire", "Rhode Island","Vermont", "New Jersey", "New York", "Pennsylvania")
 midwest <- c("Illinois", "Indiana", "Michigan", "Ohio", "Wisconsin", "Iowa", "Kansas", "Minnesota", "Missouri", "Nebraska", "North Dakota", "South Dakota")
@@ -213,8 +213,6 @@ cleaned_data_strat_count <- cleaned_data_strat %>%
   group_by(gender, 
            age_group,
            household_income,
-           education,
-           is_hispanic,
            race_ethnicity,
            census_region
            )%>% 
@@ -223,4 +221,4 @@ cleaned_data_strat_count <- cleaned_data_strat %>%
 total <-  sum(cleaned_data_strat_count$count)
 
 cleaned_data_strat_count <- cleaned_data_strat_count %>%
-  mutate(freq = count / total)
+  mutate(prop = count / total)
