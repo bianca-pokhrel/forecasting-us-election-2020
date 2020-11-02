@@ -243,6 +243,22 @@ income_prop %>%
             lower = quantile(vote_pred, 0.025),
             higher = quantile(vote_pred, 0.975))
 
+### 'beautiful' graphs ###
+age_prop %>% 
+  ggplot(aes(y = mean, x = forcats::fct_inorder(age_group), color = "MRP estimate")) + 
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0) + 
+  ylab("Proportion of voters for Trump") + 
+  xlab("age groups in 2016") + 
+  geom_point(data = cleaned_data_strat %>% 
+               group_by(age_group) %>%
+               summarise(n = n()) %>% 
+               group_by(age_group) %>% 
+               mutate(prop = n/sum(n)), 
+             aes(age_group, prop, color = "MNCS raw data")) +
+  scale_color_manual(name = "", values = c("MRP estimate" = "black", "MNCS raw data" = "red")) + 
+  theme_bw(base_size = 14) +
+  ggtitle("Proportion of women keeping name after marriage")
 
 ### brm ###
 
