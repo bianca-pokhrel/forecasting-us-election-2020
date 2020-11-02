@@ -1,0 +1,1120 @@
+---
+title: "Binary Logistic Regression Model: Joe Biden predicted to win by popular vote"
+author: "Mackenzie Qu, Bianca Pokhrel, Zhuoqian Li"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+abstract: |
+  The result of the 2020 presidential election in the US has been a pressing topic. In this paper, we aim to predict the cadidate who will win the popular vote by a binary logistic model using race, gender, age, state, and household income as predictors. Our result suggests that Joe Biden will surpass Donald Trump in popular vote significantly, thus further secure the presidency. 
+  
+  **Keywords:** forecasting; US 2020 election; Trump; Biden; Multilevel Regression with Post Stratification
+output: 
+  bookdown::pdf_document2:
+    citation_package: natbib
+bibliography: reference.bib
+---
+# Introduction
+On November 3rd, voters will cast their last ballot for the 2020 U.S presidential election as either Donald Trump or Joe Biden will become the next president of the United States of America. Americans are eager to acquire more information of the upcoming election from various sources of election forecast. In this paper, we explored the data from Democracy Fund + UCLA Nationscape and American Community Surveys in a binary logistic regression, aiming to predict the election result by popular vote. 
+
+Upon fitting the datasets into our model, we have made some significant findings. Our model suggests that Biden is likely to win the popular vote by 16.32%, compared to the last election where Hilary Clinton won the popular vote by 2%, yet still lost the election. This finding is significant as it gives us more confidence that Joe Biden may win the election. We also looked at the geographic representations of popular vote. In general, East and West Coast shows higher preference of Biden in comparison to mid-west and south. We have also looked at some socio-demographic factors such as age, gender, race and income. Given the current pandemic, we have observed some interesting result from the variables above, which will be throughly explored in the discussion. The data wrangling and model for this paper is done using statistical language @citeR in Rmarkdown(@cite_rmarkdown1)(@cite_rmarkdown2)(@cite_rmarkdown3). To reproduce the result, code can be accessed at: "https://github.com/bianca-pokhrel/forecasting-us-election-2020"
+
+In conclusion, our findings suggest that Biden may win this election by popular vote. The remainder of this paper further discusses the two survey data respectively in section 2 and 3, model design and justification in section 4, and results in section 5, as well as discussion in section 6, intending to provide a explanation for our prediction. That being said, our results are limited to forecasting the popular vote, while having little ability to predict the winner of this election as it does not include information on electoral colleges.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+#### Workspace setup ####
+library(haven)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(usmap)
+library(knitr)
+library(kableExtra)
+library(gridExtra)
+library(waffle)
+```
+
+
+```{r individule_level_data, include=FALSE, warning=FALSE}
+#### Preamble ####
+# Purpose: Prepare and clean the survey data downloaded from []
+# Author: Huining Qu
+# Data: 26 October 2020
+# Contact: mackenzie.qu@mail.utoronto.ca
+# License: MIT
+# Pre-requisites: 
+# - Need to have downloaded the data from X and save the folder that you're 
+# interested in to inputs/data 
+# - Don't forget to gitignore it!
+
+# Read in the raw data (You might need to change this if you use a different dataset)
+raw_data <- read_dta("ns20200625.dta")
+# Add the labels
+raw_data <- labelled::to_factor(raw_data)
+# Just keep some variables
+reduced_data <- 
+  raw_data %>% 
+  select(registration,
+         vote_2016,
+         vote_intention,
+         trump_biden,
+         ideo5,
+         gender,
+         race_ethnicity,
+         household_income,
+         state,
+         census_region,
+         age)
+
+
+#### Clean Up ####
+# make age group "18-29", "30-44", "45-59", "60+"
+cleaned_data <- reduced_data %>%
+  mutate(age_group = case_when(
+    age >= 60 ~ "60+",
+    age >= 45 & age <= 59 ~ "45 to 59",
+    age >= 30 & age <= 44 ~ "30 to 44",
+    age >= 18 & age <= 29 ~ "18 to 29",
+  )
+           )
+
+# removes observation who will not vote or not eligible to vote
+cleaned_data<-cleaned_data[!(cleaned_data$vote_intention
+                           =="No, I will not vote but I am eligible" &
+                             cleaned_data$vote_intention
+                           =="No, I am not eligible to vote"&
+                             cleaned_data$vote_intention
+                           =="Not sure" &
+                             cleaned_data$vote_intention
+                           =="NA's"),]
+
+# clean up trump_biden variable by grouping NA and simplifying name
+cleaned_data<- cleaned_data%>%
+  mutate_at(vars(trump_biden), .funs = 
+              funs(case_when(
+                .== "Joe Biden" ~ "Biden",
+                .== "Donald Trump" ~ "Trump",
+                .== "Dont Know" ~ "NA",
+                .== "NA's" ~ "NA"
+              )))
+
+# name matcher unifies the state name in 2 datasets. 
+names_matcher <- tibble(state_name = state.name, state = state.abb)
+cleaned_data<-
+  cleaned_data%>%
+  left_join(names_matcher)
+
+# remove all na contained in Biden trump for later modeling 
+cleaned_data<-cleaned_data%>%
+  drop_na(trump_biden)
+
+# clean vote_2016
+cleaned_data<- cleaned_data%>%
+  mutate_at(vars(vote_2016), .funs = 
+              funs(case_when(
+                .== "Hillary Clinton" ~ "Hillary Clinton",
+                .== "Donald Trump" ~ "Donald Trump",
+                .== "Gary Johnson" ~ "Others",
+                .== "Jill Stein" ~ "Others",
+                .== "Someone else:" ~ "Others",
+                .== "Did not vote, but was eligible" ~ "Others",
+                .== "Was not eligible to vote" ~ "Others",
+                .== "Don't recall" ~ "Others"
+              )))
+
+# clean race_ethnicity
+cleaned_data<-cleaned_data%>%
+  mutate_at(vars(race_ethnicity), .funs = 
+              funs(case_when(
+                .== "White" ~ "White",
+                .== "Black, or African American" ~ "African American",
+                .== "American Indian or Alaska Native" ~ "Native American",
+                .== "Asian (Asian Indian)" ~ "Other Asian or Pacific Islander",
+                .== "Asian (Chinese)" ~ "Asian(Chinese or Japanese)",
+                .== "Asian (Filipino)" ~ "Other Asian or Pacific Islander",
+                .== "Asian (Japanese)" ~ "Asian(Chinese or Japanese)",
+                .== "Asian (Korean)" ~ "Other Asian or Pacific Islander",
+                .== "Asian (Vietnamese)" ~ "Other Asian or Pacific Islander",
+                .== "Asian (Other)" ~ "Other Asian or Pacific Islander",
+                .== "Pacific Islander (Native Hawaiian)" ~ "Other Asian or Pacific Islander",
+                .== "Pacific Islander (Guamanian)" ~ "Other Asian or Pacific Islander",
+                .== "Pacific Islander (Samoan)" ~ "Other Asian or Pacific Islander",
+                .== "Pacific Islander (Other)" ~ "Other Asian or Pacific Islander",
+                .== "Some other race" ~ "Others"
+              )))
+
+
+#clean income
+cleaned_data<- cleaned_data%>%
+  mutate_at(vars(household_income), .funs = 
+              funs(case_when(
+                .=="Less than $14,999"~"Less than $24,999",
+                .=="$15,000 to $19,999"~"Less than $24,999",
+                .=="$20,000 to $24,999"~"Less than $24,999",
+                .=="$25,000 to $29,999"~"$25,000 to $49,999",
+                .=="$30,000 to $34,999"~"$25,000 to $49,999",
+                .=="$35,000 to $39,999"~"$25,000 to $49,999",
+                .=="$40,000 to $44,999"~"$25,000 to $49,999",
+                .=="$45,000 to $49,999"~"$25,000 to $49,999",
+                .=="$50,000 to $54,999"~"$50,000 to $74,999",
+                .=="$55,000 to $59,999"~"$50,000 to $74,999",
+                .=="$60,000 to $64,999"~"$50,000 to $74,999",
+                .=="$65,000 to $69,999"~"$50,000 to $74,999",
+                .=="$70,000 to $74,999"~"$50,000 to $74,999",
+                .=="$75,000 to $79,999"~"$75,000 to $99,999",
+                .=="$80,000 to $84,999"~"$75,000 to $99,999",
+                .=="$85,000 to $89,999"~"$75,000 to $99,999",
+                .=="$90,000 to $94,999"~"$75,000 to $99,999",
+                .=="$95,000 to $99,999"~"$75,000 to $99,999",
+                .=="$100,000 to $124,999"~"$100,000 to $124,999",
+                .=="$125,000 to $149,999"~"$125,000 to $149,999",
+                .=="$150,000 to $174,999"~"$150,000 to $174,999",
+                .=="$175,000 to $199,999"~"$175,000 to $199,999",
+                .=="$200,000 to $249,999"~"More than $200,000",
+                .=="$250,000 and above"~"More than $200,000",
+                .=="NA's"~"NA",
+              )))
+
+# save cleaned_data
+save(cleaned_data, file = "cleaned_survey_data.Rdata")
+```
+
+# Democracy Fund + UCLA Nationscape Survey Data
+
+## Survey
+
+The individual-level data used is the result of the Democracy Fund + UCLA Nationscape survey(@cite_survey) conducted on June 25th 2020. Nationscape conducts various interviews over 80 weeks, targeting Americans over the age of 18 to gain an insight of the 2020 election. The specific survey we have used contains 6,479 interview responses. 
+
+The Democracy Fund + UCLA Nationscape survey was conducted as a non-probability online survey, with samples provided by Lucid, a third party market research platform. Prior to publishing the survey, a demographic quota was first decided on age, gender, ethnicity, region, income, and education. Such a quota insures the representation of all American voters. Upon setting up the quota, the respondents are then sourced by Lucid Marketplace suppliers, each with different survey methodology including target emails, online portal, offerwalls, and SMS or in-app messaging(@cite_lucid), and sent directly to the survey software operated by Nationscape.
+
+The survey contains 265 questions in three major catagories First of all the survey contains questions about the respondents’ attitudes, such as whether they approve Donald Trump handling his job as president. Second type of questions asks about respondents’ behavior, such as vote intention. Thirdly, the survey asks the respondents’ to state the facts of their lives, such as their gender, age, or whether they have been sick with coronavirus. Each type of question serves its unique purpose. In particular, Nationscape used the results of the third type of question(i.e. facts) to compare with the results from large government surveys. The survey data are weighted from the 2017 American Community Survey to represent the American population using simple ranking techniques. More details of the weighting technique is discussed in Appendix 1. 
+In addition, some adjustments are done to the data including handling non-response. First of all, voting rates in 2016 were adjusted. Some younger respondents reported voting in 2016 even though their age indicated that they were eligible to vote. As a result, a -2.7 percent point adjustment is made for young respondents. Moreover, some respondents may choose not to disclose household income. In effect, non-respondents are not weighted for income. 
+
+Overall, the survey is self contained. Though Nationscape has chosen a third party for sampling, Lucid’s sample has been proven high quality by previous evaluations(@cite_lucid2). Moreover, Lucid has its own quality program to evaluate and ensure the sample quality and minimize sampling bias. The survey covers the majority of the predictors of the 2020 election in detail, which provides us an insight of the electoral forecast, as well as a wide range of explanatory variables to base the model off.  
+
+However, some weaknesses of the survey must be taken into account. First of all, not only has the survey taken a non-probability quota approach, the sampling method also differs depending on the suppliers, thus does not provide a consistent sampling technique. Consequently, the data may face selection bias and bias due to non-response. Secondly, though the simple ranking technique used for weighting has an advantage of time and cost efficiency, its explanatory power decreases quickly with an increasing number of criteria(@cite_weighting). It is justified that more complicated weighting methods would not provide significant benefit(@cite_methodology), however, it still may increase the overall representativeness of the data. Moreover, the survey was completely voluntary via online software, yet, more than 200 questions were asked. Some may question the quality of responses for such a time consuming survey. Also the mid drop out rate may be accountable for non-response bias.
+
+
+## Dataset
+
+Among over 200 survey questions, we have first used the vote intention to filter out respondents who are either not eligible to vote, or choose not to.  We would like to determine whether Donald Trump or Joe Biden would gain popular votes, thus have chosen some specific variables, aiming to predict the election result. In particular, demographic variables such as state, census region, age, gender, race, as well as income are selected for the purpose of this paper. In addition, respondents’  political stance and vote history are included in this section, even though it is not used for modeling. It serves the purpose of visualizing vote intentions based on history and ideologies, and may provide further insights of the election.  
+Our data wrangling is completed in the statistical language R(@citeR), using haven(@cite_haven), tidyverse(@cite_tidyverse), dplyr(@cite_dplyr), ggplot2(@cite_ggplot2), usmap(@cite_usmap), waffle(@cite_waffle), tydyr(@cite_tidyr), knitr(@cite_knitr1)(@cite_knitr2)(@cite_knitr3), gridExtra(@cite_gridExtra), and kabelExtra(@cite_kableExtra).
+
+## Data Preview
+
+Below(Table \@ref(fig:data)) is a preview
+
+```{r data, fig.cap= "Democracy Fund + UCLA Nationscape Survey data preview", echo=FALSE}
+kable(head(cleaned_data[1:6]), format="latex", booktabs=TRUE) %>% 
+  kable_styling(latex_options="scale_down")
+
+kable(head(cleaned_data[7:13]), format="latex", booktabs=TRUE) %>% 
+  kable_styling(latex_options="scale_down")
+```
+
+## Data Discussion
+The graphs of our raw data contain both election forecasts by popular vote, and visualizations of predictor variables used in the model. We are going to discuss some interesting observations.
+
+First of all, we plotted the expected vote counts for both Donald Trump and Joe Biden(Figure \@ref(fig:vote)). The plot shows 3,068 confirmed voters among the respondents would vote for Biden, while 2,619 would vote for Trump, suggesting that Biden is expected to exceed Trump’s vote by 7.89%. 
+
+Secondly, when looking at the expected popular vote for each state(Figure \@ref(fig:state)), it is noticeable that the west and east coast lean towards Biden and his Democratic Party. On the other hand, Trump is comparatively more popular in the Midwest and South region. 
+
+Thirdly, the political ideology of Trump/Biden supporters also provides crucial information for the upcoming election. It is indicated in Figure \@ref(fig:stance) that the majority of Biden’s votes are gained from liberal/very liberal individuals. In comparison, Trump’s majority votes are from a more conservative spectrum. 
+
+Also, Figure 4 not only suggests that Trump has a large number of repeated voters, but it also shows that Biden has gained the majority of voters who voted Hilary Clinton in 2016, as well as people who did not vote.(Figure \@ref(fig:vote2016)) This finding is significant as it shows more people have decided to vote. 
+
+Figure 5 to Figure 8 visualizes the distribution of some explanatory variables for our model. Here are some interesting findings:
+
+Biden has a majority of female voters, while Trump has a majority of male voters(Figure \@ref(fig:gender)). Although the majority of both Trump and Biden voters are white, minority racial groups are biased towards Biden(Figure \@ref(fig:race)). Biden is preferred among younger voters(Figure \@ref(fig:age)). Despite that the distribution of Trump and Biden’s votes by household income is similar, more low income households prefer Biden over Trump(Figure \@ref(fig:income)).
+
+
+
+```{r vote, fig.cap="Vote intention 2020", fig.dim=c(4,2), echo=FALSE}
+#Plot Biden Trump expected votes
+cleaned_data%>%
+  ggplot(aes(y=trump_biden, fill = trump_biden))+
+  geom_bar(stat="count", width = 0.6)+
+  scale_x_continuous(name = "Vote count", 
+                     breaks = seq(0,3500, 500))+
+  ylab("Vote Intention")+
+  scale_fill_manual(values=c("Biden"= "steelblue3","Trump"= "lightcoral"), 
+                    name = "Vote")+
+  theme_minimal()
+```
+
+```{r state, fig.cap="Election forecast by States", fig.dim=c(5,3), echo = FALSE}
+#create data frame containing the frequency of biden/trump's votes of each state
+state_vote<-as.data.frame(table(cleaned_data$trump_biden, cleaned_data$state_name))
+#create new data frame
+election_forecast<-data.frame(stringsAsFactors = FALSE)
+#compare trump/biden's vote for each state, bind the person with majority vote 
+#in the new data frame created. 
+for (i in seq(1,dim(state_vote)[1],2)){
+  if (state_vote$Freq[i] > state_vote$Freq[i+1]){
+    election_forecast<-rbind(election_forecast,
+                            c(as.character(state_vote$Var1[i]), 
+                              as.character(state_vote$Var2[i])),
+                            stringsAsFactors = FALSE)
+  }
+  else {
+    election_forecast<-rbind(election_forecast,
+                            c(as.character(state_vote$Var1[i+1]), 
+                              as.character(state_vote$Var2[i+1])),
+                            stringsAsFactors = FALSE)
+  }
+}
+#change data frame variable names
+names(election_forecast)[1]<-"vote"
+names(election_forecast)[2]<-"state"
+#use usmap to graph the new data, visualize the person with majority vote each state. 
+plot_usmap(data=election_forecast, values = "vote")+
+  scale_fill_manual(values = c("steelblue3", "lightcoral"))+
+  theme(legend.position = "right")+
+  labs(title = "Election Forecast by States", fill = "Vote")
+```
+
+
+```{r stance, fig.cap="Vote intention by political stance", fig.dim=c(3,2), echo=FALSE}
+ggplot(cleaned_data, aes(x=ideo5, fill=trump_biden))+
+  geom_bar(alpha = 0.8)+
+  facet_wrap(~trump_biden, ncol=1)+
+  coord_flip()+
+  theme_minimal()+
+  ylab("Vote Count")+
+  xlab("Political Stance")+
+  theme(axis.text.y = element_text(size=6))+
+  scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
+```
+
+```{r vote2016, fig.cap="Vote intention by 2016 vote", fig.dim=c(3,2), echo=FALSE}
+ggplot(cleaned_data, aes(x=vote_2016, fill=trump_biden))+
+  geom_bar(alpha = 0.8)+
+  facet_wrap(~trump_biden, ncol=1)+
+  coord_flip()+
+  theme_minimal()+
+  ylab("Vote Count")+
+  xlab("2016 Vote")+
+  scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
+```
+
+```{r gender, fig.cap="Vote intention by gender", fig.dim=c(4,2), echo=FALSE}
+ggplot(cleaned_data, aes(x=gender, fill=trump_biden))+
+  geom_bar(alpha = 0.8)+
+  facet_wrap(~trump_biden, ncol=1)+
+  coord_flip()+
+  theme_minimal()+
+  ylab("Vote Count")+
+  xlab("Gender")+
+  scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
+```
+
+```{r race, fig.cap="Vote intention by race", fig.dim=c(4,2), echo = FALSE}
+ggplot(cleaned_data, aes(x=race_ethnicity, fill=trump_biden))+
+  geom_bar(alpha = 0.8)+
+  facet_wrap(~trump_biden, ncol=1)+
+  coord_flip()+
+  theme_minimal()+
+  ylab("Vote Count")+
+  xlab("Race")+
+  theme(axis.text.y = element_text(size=6))+
+  scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
+```
+
+
+```{r age, fig.cap="Vote intention by age", fig.dim=c(3,2), echo = FALSE}
+ggplot(cleaned_data, aes(x=as.factor(age_group), fill=trump_biden))+
+  geom_bar(alpha = 0.8)+
+  facet_wrap(~trump_biden, ncol=1)+
+  coord_flip()+
+  theme_minimal()+
+  ylab("Vote Count")+
+  xlab("Age Group")+
+  scale_x_discrete(labels = c("18~29","30~44", "45~59","60+"))+
+  scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
+```
+
+
+```{r income, fig.cap="Vote intention by household income", fig.dim=c(3,2), echo=FALSE}
+# Graph household income tears for trump/biden votes. 
+# remove na, and levels ensures the order presented on graph
+ggplot(data = subset(cleaned_data, !is.na(household_income)), aes(x=factor(household_income, 
+                                  levels = c("Less than $24,999",
+                                             "$25,000 t0 $49,999",
+                                             "$50,000 to $74,999",
+                                             "$75,000 to $99,999",
+                                             "$100,000 to $124,999",
+                                             "$125,000 to $149,999",
+                                             "$150,000 to $174,999",
+                                             "$175,000 to $199,999",
+                                             "$200,000 and above"),
+                                  exclude = "NA"), 
+                         fill=trump_biden))+
+  geom_bar(alpha = 1)+
+  facet_wrap(~trump_biden, ncol=1)+
+  coord_flip()+
+  theme_minimal()+
+  ylab("Vote Count")+
+  xlab("Household Income")+
+  theme(axis.text.y = element_text(size=6))+
+  scale_fill_manual(values = c("steelblue3", "lightcoral"), guide = FALSE)
+```
+
+
+```{r clean_post_stratification_data, warning=FALSE, include=FALSE}
+library(haven)
+library(tidyverse)
+library(dplyr)
+# Read in the raw data. 
+# Rstudio:
+# raw_data <- read_dta("Data/usa_00002.dta")
+
+# Local Computer:
+#raw_data <- read_dta("Part\ 2/usa_00003.dta")
+raw_data <- read_dta("Data/usa_00006.dta")
+# Add the labels
+raw_data <- labelled::to_factor(raw_data)
+names(raw_data)
+
+reduced_data <- 
+  raw_data %>% 
+  dplyr::select(region,
+         citizen,
+         stateicp,
+         sex, 
+         age, 
+         race, 
+         hispan,
+         bpl,
+         educd,
+         empstatd,
+         ftotinc)
+reduced_data <- rename(reduced_data, gender = sex)
+reduced_data <- rename(reduced_data, state = stateicp)
+rm(raw_data)
+
+### race, hispanic, gender, age, state, income, education, employment
+
+
+#### Cleaning data labels to match up with survey data ####
+#Sort for age >= 18
+citizens <- reduced_data %>% filter(citizen == "naturalized citizen" | citizen == "born abroad of american parents") %>% filter(as.numeric(ftotinc) < 9999999)
+reduced_data_18 <- citizens %>% filter(as.numeric(age) > 18)
+
+#Consitent gender labels
+reduced_data_18 <- reduced_data_18 %>%  mutate_at(vars(gender), .funs = 
+                                                    funs(case_when(.== "male" ~ "Male",
+                                                                   .== "female" ~ "Female")))
+#Foreign born -> US or another country
+unique(reduced_data_18$bpl) 
+us_states <- c('alabama', 
+               'alaska', 
+               'arizona',
+               'arkansas', 
+               'california', 
+               'colorado', 
+               'connecticut', 
+               'delaware', 
+               'florida', 
+               'georgia', 
+               'hawaii', 
+               'idaho', 
+               'illinois',
+               'indiana', 
+               'iowa', 
+               'kansas', 
+               'kentucky', 
+               'louisiana', 
+               'maine', 
+               'maryland',
+               'massachusetts', 
+               'michigan', 
+               'minnesota', 
+               'mississippi', 
+               'missouri', 
+               'montana', 
+               'nebraska', 
+               'nevada', 
+               'new hampshire', 
+               'new jersey', 
+               'new mexico', 
+               'new york', 
+               'north carolina', 
+               'north dakota', 
+               'ohio', 
+               'oklahoma', 
+               'oregon', 
+               'pennsylvania',
+               'rhode island', 
+               'south carolina', 
+               'south dakota', 
+               'tennessee', 
+               'texas', 
+               'utah', 
+               'vermont', 
+               'virginia', 
+               'washington', 
+               'west virginia', 
+               'wisconsin', 
+               'wyoming',
+               'u.s. virgin islands')
+
+reduced_data_18 <- reduced_data_18 %>% 
+  mutate(foreign_born = ifelse(bpl %in% us_states, "US", "Foreign Country")) 
+
+#Household income -> Brackets
+unique(reduced_data_18$ftotinc) 
+
+reduced_data_18 <- reduced_data_18 %>% mutate(household_income = case_when(
+  ftotinc <= 24999 ~ "Less than $24,999",
+  (24999 < ftotinc & ftotinc <= 49999) ~ "$25,000 to $49,999",
+  (49999 < ftotinc & ftotinc <= 74999) ~ "$50,000 to $74,999",
+  (74999 < ftotinc & ftotinc <= 99999) ~ "$75,000 to $99,999",
+  (99999 < ftotinc & ftotinc <= 124999) ~ "$100,000 to $124,999",
+  (124999 < ftotinc & ftotinc <= 149999) ~ "$125,000 to $149,999",
+  (149999 < ftotinc & ftotinc <= 174999) ~ "$150,000 to $174,999",
+  (174999 < ftotinc & ftotinc <= 199999) ~ "$175,000 to $199,999",
+  199999 < ftotinc ~ "More than $200,000",
+  is.na(ftotinc) ~ "NA"))
+
+# Education -> Brackets
+unique(reduced_data_18$educd) 
+
+less_educ = c("kindergarten", "nursery school, preschool", "no schooling completed", "grade 1", "grade 2", "grade 3", "grade 4", "grade 5", "grade 6", "grade 7", "grade 8")
+high_school_in_progress = c("grade 9","grade 10","grade 11","grade 12, no diploma")
+
+reduced_data_18 <- reduced_data_18 %>% mutate(education = case_when(
+  (educd == '1 or more years of college credit, no degree' |  educd == "some college, but less than 1 year") ~ "Completed some college, but no degree",
+  educd == "associate's degree, type not specified" ~ "Associate Degree",
+  educd == "master's degree" ~ "Masters degree",
+  educd == "doctoral degree" ~ "Doctoral degree",
+  educd == "bachelor's degree" ~ "College degree",
+  educd == "regular high school diploma" ~ "High school graduate",
+  educd == "ged or alternative credential" ~ "Ged or alternative credential",
+  educd == "professional degree beyond a bachelor's degree" ~ "Professional degree beyond a bachelor's degree",
+  TRUE ~ "Other"))
+#(is.na(educd) | educd %in% less_educ)
+
+# New col -> age group
+reduced_data_18 <- reduced_data_18 %>% mutate(ages = case_when(as.numeric(age) < 30 ~ "18 to 29",
+                                                                    (30 <= as.numeric(age) & as.numeric(age) < 45) ~ "30 to 44",
+                                                                    (45 <= as.numeric(age) & as.numeric(age) < 60) ~ "45 to 59",
+                                                                    TRUE ~ "60+"))
+
+# Hispanic->
+unique(reduced_data_18$hispan)
+reduced_data_18 <- reduced_data_18 %>% mutate(is_hispanic = case_when(hispan == "not hispanic" ~ "Not Hispanic",
+                                                                   TRUE ~ "Hispanic"))
+
+# Employment
+unique(reduced_data_18$empstatd) 
+
+reduced_data_18 <- reduced_data_18 %>% mutate(employment = case_when(empstatd == "at work" ~ "Full-time employed",
+                                                                     empstatd == "not in labor force" ~ "Not in labor force",
+                                                                     empstatd == "unemployed" ~ "Unemployed",
+                                                                     empstatd == "has job, not working" ~ "Has job, not working",
+                                                                     TRUE ~ "Other"))
+
+# Race 
+unique(reduced_data_18$race) 
+reduced_data_18 <- reduced_data_18 %>% mutate(race_ethnicity = case_when(race == "white" ~ "White",
+                                                                         race == "black/african american/negro" ~ "African American",
+                                                                         race == "other asian or pacific islander" ~ "Other Asian or Pacific Islander",
+                                                                         race == "american indian or alaska native" ~ "Native American",
+                                                                         race == "chinese" ~ "Asian(Chinese or Japanese)",
+                                                                         race == "japanese" ~ "Asian(Chinese or Japanese)",
+                                                                         TRUE ~ "Others"))
+
+reduced_data_18 <- filter(reduced_data_18, state != "district of columbia")
+
+### Stratified count
+cleaned_data_strat <- 
+  reduced_data_18 %>% 
+  dplyr::select(gender, 
+         state,
+         ages,
+         race_ethnicity, 
+         household_income)
+
+
+cleaned_data_strat <- rename(cleaned_data_strat, age_group = ages)
+cleaned_data_strat <-rename(cleaned_data_strat, state_name = state)
+
+cleaned_data_strat_count <- cleaned_data_strat %>%
+  group_by(gender, 
+           age_group,
+           household_income,
+           race_ethnicity,
+           state_name
+           )%>% 
+  summarise(n = n()) 
+
+save(cleaned_data_strat_count, file = "post-strat")
+
+
+age_pie <- ggplot(cleaned_data_strat, aes(x=factor(1), fill=age_group))+
+  geom_bar(width = 1)+
+  coord_polar("y")
+
+gender_pie <- ggplot(cleaned_data_strat, aes(x=factor(1), fill=gender))+
+  geom_bar(width = 1)+
+  coord_polar("y")
+
+state_bar<-ggplot(cleaned_data_strat, aes(x=state_name))+
+  geom_bar(width = 1)
+
+race_pie <- ggplot(cleaned_data_strat, aes(x=factor(1), fill=race_ethnicity))+
+  geom_bar(width = 1)+
+  coord_polar("y")
+
+income_pie <- ggplot(cleaned_data_strat, aes(x=factor(1), fill=household_income))+
+  geom_bar(width = 1)+
+  coord_polar("y") 
+
+```
+
+
+
+\newpage
+# Post-Stratification Data
+
+## Data Source and The American Community Survey (ACS)
+The data used to construct the post-stratification dataset was a selected subset of the data collected through the American Community Surveys (@cite_ACS). The data was retrieved from IPUMS with a density of 0.2 due to the full size of the dataset being quite large. Data from 2018 was chosen since the goal of the model is to predict 2020 election results, as a result, it was ideal to choose the most recent dataset that was available in IPUMS.
+
+The ACS run by the Census Bureau is performed by sending a survey to a sample of the population in the 50 states every month of every year. The population of this survey would be the American population, and the frame would be the 140 million addresses of American citizens available to the Census Bureau. Respondents are chosen by their address to ensure geographical coverage, and no respondent is to be selected more than once within 5 years. According to the Census Bureau, the survey is mailed to approximately 295,000 respondents a month. Respondents are allowed to respond to the survey in multiple ways such as by mail, telephone, internet, or in-person interviews.  Furthermore, it can be noted that the addresses selected for the ACS are required by law to accurately respond to all questions (@cite_ACS_Guide). The multitude of methods that respondents can use to respond to the survey, as well as the legal component, allow for the Census Bureau to collect data on most of the 295,000 chosen addresses that make up the sample. 
+
+In addition, the guide released by the Census Bureau states that in person interviews are conducted for the addresses if there had been a non-response for 3 months. Moreover, the Census Bureau conducted telephone follow-ups for the questionnaires that were returned incomplete or needed clarification (@cite_ACS_Guide).
+
+The main strength of the survey is that it is conducted very often and the survey collects a large amount and variety of data on the respondents. As a result, the ACS can provide an accurate and current reflection of American communities. Moreover, the survey is conducted by an official government organization, which has access to a large amount of resources to facilitate the survey distribution and data collection. Furthermore, respondents are allowed to respond to the survey in multiple ways such as by mail, telephone, internet, or in-person interviews. 
+
+## Dataset 
+The variables included in the post stratification dataset were the variables that were determined to have a larger impact in the model. As a result, the variables included were age, gender, income, census regions, state, and race. The age variable represents the age range which corresponds to the age of respondent. Originally the age variable was just the age of the respondent when extracted from the IPUMS data. However, it was changed to be a range for the development of a model since it is easier for the model to determine the impact of a range of ages in comparison to exact age. Similarly, income groups were built from household income for the same reason. 
+
+In addition, state was chose to represent geographical location over census region in the final model due to there being 50 states in the US. The large number of states could help draw more specific conclusions. 
+
+Below is a preview of the finalized cleaned dataset(Table \@ref(fig:acspreview)) with counts for each subgroup. However, it should be notified that the count for post stratification can be relatively small to the overall size of the dataset since we have state as our predictor, which can have 50 possible values.
+
+```{r acspreview, fig.cap="A preview of ACS Data", echo=FALSE}
+knitr::kable(head(cleaned_data_strat_count))
+```
+
+
+(Figure \@ref(fig:varpie2)) shows the distribution of our predictor variables
+
+\newpage
+
+```{r stratbar, fig.dim=c(10,4), echo=FALSE}
+state_bar  + 
+  theme(axis.text.x = element_text(margin = unit(c(-20, 0, 0, 0), "pt"), angle = 70, vjust = 0.5, hjust=1))
+```
+
+```{r varpie, fig.dim=c(10,4), fig.align = "center", echo=FALSE }
+grid.arrange(age_pie, gender_pie, nrow = 1)
+
+```
+
+
+```{r varpie2, fig.cap="Distribution of Predictor Variables", fig.show="hold", fig.dim=c(15,4), fig.align = "center", echo=FALSE }
+grid.arrange( race_pie, income_pie, nrow = 1)
+
+```
+
+\newpage
+
+(Figure \@ref(fig:varpie2)) demonstrate the distribution of the variables used for the development of the model. We can notice that the distribution of the variables are different but close to the distribution obtained by the survey mentioned in the previous section where there are not any major discrepancies. It can be noted that a lot of respondents are from California, Texas, and Florida, which is representative of the distribution of the american population among the 50 states. 
+
+## Overview of MRP
+Multilevel modelling with post stratification (MRP) is often used to help bridge the difference between non-representative survey samples and the actual demographics of the population. MRP is often done by first training a model from the survey data where the individual response is estimated. The estimation of the effect of individual predictors is typically improved through the use of multilevel modeling. Then the model is applied onto another dataset whose percentages of each type of sub population is more accurate to re-weight the estimates (@cite_MRP_ex). A benefit of this method is that it permits the use of broad surveys for analysis with regards to subgroups. However, it should be noted that there will be a larger uncertainty for the estimates. A caveat of MRP is that it requires the assumption that we know the composition of our population. Although this point is not as applicable to the point of research in this paper, it could cause an issue when trying to post-stratify a variable whose distribution is not clearly known (@cite_MRP).
+
+\newpage
+# Model
+```{r, include=FALSE}
+#### Preamble ####
+# Purpose: Model Fit & Predicition to Forecast US Election 2020
+# Author: Bianca Pokhrel
+# Data: 30 October 2020
+# Contact: bianca.pokhrel@mail.utoronto.ca
+# License: MIT
+# Pre-requisites: 
+# - Need to have downloaded the ACS data and saved it to inputs/data
+# - Don't forget to gitignore it!
+
+#Work place set up
+#install.packages("broom")
+#install.packages("here")
+#install.packages("skmr")
+# install.packages("tidyverse")
+# install.packages("dplyr")
+# install.packages("labelled")
+# install.packages("ggplot2")
+#install.packages("readxl")
+#install.packages("devtools")
+#install.packages("digest")
+#install.packages("foreign")
+#install.packages("arm")
+#install.packages("brms")
+#install.packages("effects")
+# install.packages("haven")
+#install.packages("aod")
+library(tidyverse)
+library(labelled)
+library(dplyr)
+library(ggplot2)
+library(readxl)
+library(foreign)
+library(effects)
+library(haven)
+
+```
+
+```{r, echo=FALSE}
+#### ok now I have the real data ####
+
+#create binary var
+cleaned_data$trump_biden[cleaned_data$trump_biden %in% "Trump"] <- 1
+cleaned_data$trump_biden[cleaned_data$trump_biden %in% "Biden"] <- 0
+
+cleaned_data$state_name = tolower(cleaned_data$state_name)
+#set as numeric
+#convert from chr to numeric
+cleaned_data$trump_biden = as.numeric(cleaned_data$trump_biden)
+
+# omit the NA's since model will remove them anyway
+cleaned_data = na.omit(cleaned_data)
+
+```
+
+## Variable Selection
+
+Our primary goal in this report is to be able to cast predictions on the upcoming U.S.
+presidential election. The importance of forecasting the 2020 election cannot be understated after the fiasco of the 
+2016 election results. In this section we will talk about our model development process and how we decided to use a 
+logistic regression using the glm() function in R.
+
+As discussed in the previous data section, we have taken particular interest in the following variables:
+
+  -gender (categorical)  
+  -race/ethnicity (categorical) 
+  -household income (categorical)  
+  -states (categorical)  
+  -age group (categorical)  
+
+We have picked gender as a categorical variable of interest as from the 2016 election, the percentage of women who voted for Trump was 42% (@citePEW). We would like to see how over the course of his administration, that percentage has potentially changed. Gender is considered a categorical variable as there are specific categories of gender and there is no intrinsic ordering to the categorical- this is also called a nominal variable.
+
+Secondly, we have picked race/ethnicity as a categorical variable of interest. In the current climate, the U.S. remains extremely racially divided. Since 2016 we have witnessed the White House's response to police brutality, xenophobia, islamophobia, etc. We would like to further investigate how much of a role race plays in whether Trump or Biden gets a vote. 
+
+Thirdly, we have chosen household income as a categorical variable of interest. Tax breaks and "taxing the rich" is a common rhetoric used by politicians. We want to know who this rhetoric is affecting and how one's income bracket affects who they vote for. 
+
+Fourth, we have chosen states as a categorical variable of interest. Historically, states are considered either 'red' or blue.' In election polling, an important variable to keep an eye on are the regions that may be 'swing' regions. For example, southern states such as Florida have been known to be a crucial state that can 'swing' the election spontaneously. Thus, we want to determine the significance of what regions people have answered this survey from and how crucial it is to forecasting an election. Rather than grouping states together by census region, we decided we want to be able to create categories for each of the states as we are then able to group by states and look at voting predictions in each of the states. It yields a more informative result and allows us to take note of potential 'swing-states' mentioned above.
+
+Lastly, we have chosen age groups as a categorical variable of interest. Since the 2016 election, there has been a disparity between the younger and older populations.This is in part due to topics of political interest such climate change among others.This, we want to determine the significance of what the current voting demographic is, and if they have significant sway in the determination of the presidential winner. We decided to group age into categories rather than a continuous variable as this allows us to have larger cell counts in the post-stratification phase when we look at the percentage of Trump/Biden voters in age categories. Additionally, having categories increases the readability of the model predictions as we are able to give the average reader a better understanding of the results generated.
+
+For our response variable, we have created a binary variable with 1 = Trump and 0 = Biden. Thus, to forecast the election, a vote percentage over 50% will result in the potential victory for Trump.
+
+
+### Building the model ###
+
+To build the model, we will first start with the OLS Linear Regression Model and work our way up in complexity.
+
+
+### OLS Linear Regression Model ####
+
+
+Generally, the OLS Linear Regression Model is used for continuous independent variables rather than a binary outcome variable.Despite this, it is generally good practice to check to see the fit of the data to a linear model (@cite_STA). Therefore we will model our variables of interest in the context of linear regression.
+
+Let $x_1$, $X_2$, $X_3$, $X_4$, $X_5$ represent gender, race/ethnicity, household income, states, and age group respectively. Let $Y_i$ represent the $i^{th} $response variable observation- the binary variable of Trump or Biden. We can then model our regression as:
+
+$$ Y_i = \beta_0 + \beta_1X_1 + \beta_2X_2 + \beta_3X_3 + \beta_4X_4 + \beta_5X_5 + \epsilon_i$$
+Where the beta coefficients represent the slope of the independent variables and the epsilon represents the error term for the $i^{th}$ observation.
+
+There are a few downfalls with this model. Firstly, the independent variables in our model are categorical rather than continuous. This means that our regression line will not be following a trend as the independent variables are discrete and will not follow a linear trend. Additionally, if we take a look at the following normal-QQ plot, we can see that our data shows a more S-shape rather than a linear relationship. 
+
+```{r, include=FALSE, fig.cap = "OLS Model Regression"}
+#### playing around with model fits ####
+
+set.seed(123)
+library(MASS)
+
+#run an OLS regression to start
+OLS_model <- lm(trump_biden ~ gender + factor(state_name) + factor(race_ethnicity) + 
+                  factor(household_income) + factor(age_group), 
+                data = cleaned_data)
+
+
+#plot just to see what's up... give analysis for why this definitely isn't a good model
+plot(OLS_model, which=c(1,2))
+
+
+```
+
+Clearly, we can see that this model is not fit for the data we are working with and cannot properly predict election results
+
+
+### Logistic Model Using glm ####
+
+
+Next, we will use a generalized linear model. This model allows us to define the family of linear modeling we are using. As we are using a binary outcome variable and logistic regression, we will use the binomial family with the logit function.
+
+
+For a binomial regression model, if $Y_i$ for $i = 1, ..., n$ is independently and identically distributed binomial distribution, then we can model it as the following:
+
+$$ p(Y_i = y_i) = {n_i \choose y_i}p_i^{y_i}(1-p_i)^{n_i - y_i}$$ 
+Where the $n_i$ is the sample size of the ith observation and $y_i$ is the response of the ith observation, $p_i$ is the probability of observation $y_i$ being 1.
+
+Additionally, assume these are affected by $q$ predictors listed as the x values from above. 
+
+To connect them, we can use the linear model above as a predictor. To do this we require a function to link the two together. In the case of logistic regression we can use the logit function:
+
+$$ logit = log(\frac{p}{1-p}), p = \frac{exp(log(-log(1-p)))}{1 + exp(log(-log(1-p)))}[1 + exp(-(log(-log(1-p))))]$$
+
+where the variable definitions remain the same as listed above.
+
+To validate this model, we can perform a series of checks. First we can check the Normal QQ plot to check to see if the fit of our model is better than the OLS Linear Model:
+
+```{r, echo = FALSE, fig.cap = "GLM Model"}
+#mkay so definitely not good model... QQ plot is def not linear & residuals vs. fitted aren't random/independent
+#clearly there's something else going on... spoiler- looks like it's logistic regression
+
+
+log_fit_full <- glm(trump_biden ~ (gender) + factor(race_ethnicity) + 
+                      factor(household_income) + factor(state_name) + factor(age_group), 
+               data = cleaned_data,
+               family = binomial(link = "logit")
+               )
+
+plot(log_fit_full, which=c(1,2))
+
+```
+
+From the plot above, we can see that the model is clearly a better fit than the OLS estimator. 
+
+Additionally, we can perform a series of checks such as Anova chi-squared tests and AIC values. 
+
+The AIC value of the created model is 6796.309. We will use this for comparison and we are looking for AIC values lower than the full fitted model to decide if we should drop the variable or not.
+
+#### Without State
+
+We can see that the anova checks resulted in a larger deviation after dropping the state variable. Additionally, the AIC value increased thus confirming that this is a signifcant variable
+
+```{r}
+#much better!
+# now to see which variables we can drop- combo of anova + AIC
+
+#Likelihood ratio test 1- without census region
+model_test1 <- glm(trump_biden ~ (gender) + 
+                  + factor(race_ethnicity) + factor(household_income) + factor(age_group), 
+                  data = cleaned_data,
+                  family = binomial(link = "logit"))
+knitr::kable(anova(model_test1, log_fit_full, test="Chisq"))
+knitr::kable(model_test1$aic)
+# need to keep state, AIC value also increases
+
+
+```
+
+#### Without Gender
+
+We can see that the anova checks resulted in a larger deviation after dropping the gender variable. Additionally, the AIC value increased thus confirming that this is a signifcant variable
+
+```{r}
+#Likelihood ratio test 2- without gender
+model_test2 <- glm(trump_biden ~ factor(race_ethnicity) + factor(household_income)+ 
+                     factor(state_name) + factor(age_group), 
+                    data = cleaned_data,
+                    family = binomial(link = "logit")
+)
+knitr::kable(anova(model_test2, log_fit_full, test="Chisq"))
+knitr::kable(model_test2$aic)
+# need to keep gender + AIC skyrockets
+
+```
+
+#### Without Race
+
+We can see that the anova checks resulted in a larger deviation after dropping the race variable. Additionally, the AIC value increased thus confirming that this is a signifcant variable
+
+``` {r}
+#Likelihood ratio test 3- without race
+model_test4 <- glm(trump_biden ~ (gender) + factor(household_income) + 
+                     factor(state_name) + factor(age_group), 
+                    data = cleaned_data,
+                    family = binomial(link = "logit")
+)
+anova(model_test4, log_fit_full, test="Chisq")
+knitr::kable(model_test4$aic)
+# anova checks show massive increase- definitely significant + massive increase in AIC
+
+
+```
+
+#### Without Income
+
+We can see that the anova checks resulted in a larger deviation after dropping the income variable. Additionally, the AIC value increased thus confirming that this is a signifcant variable
+
+
+```{r}
+#Likelihood ration test 4- without income
+model_test5 <- glm(trump_biden ~ (gender) + factor(race_ethnicity) + 
+                     factor(state_name) + factor(age_group), 
+                   data = cleaned_data,
+                   family = binomial(link = "logit")
+)
+knitr::kable(anova(model_test5, log_fit_full, test="Chisq"))
+knitr::kable(model_test5$aic)
+
+
+```
+
+#### Without Age
+
+
+We can see that the anova checks resulted in a larger deviation after dropping the age variable. Additionally, the AIC value increased thus confirming that this is a signifcant variable
+
+```{r}
+#Likelihood ratio test 5- without age
+model_test6 <- glm(trump_biden ~ (gender) + factor(race_ethnicity) + 
+                     factor(household_income) +  factor(state_name), 
+                    data = cleaned_data,
+                    family = binomial(link = "logit")
+)
+knitr::kable(anova(model_test6, log_fit_full, test="Chisq"))
+knitr::kable(model_test1$aic)
+# need to keep age + AIC increases
+
+# need to keep education + AIC increases
+# all in all, it tells us that we should keep the full model
+
+# calculate confidence intervals
+conf <- confint.default(log_fit_full)
+
+# look at the odds ratios and 95% CI & interpret 
+# https://stats.idre.ucla.edu/other/mult-pkg/faq/general/faq-how-do-i-interpret-odds-ratios-in-logistic-regression/
+
+con_table <- exp(cbind(OR = coef(log_fit_full), confint.default(log_fit_full)))
+
+```
+
+
+After performing the checks, we can see that the fully fitted logistic model calculated above is the optimal one. However, it is not the only model possible. Other variants exist such as the Logistic model with Bayesian Estimation. It is recommended that if there are many indpendent variables, the Bayesian model should be used however, in the context of computational power, this was not feasible for us. Building the Bayesian model took near an hour with only 2 chains thus, we decided in order to keep this as reproducible as possible, we will use the GLM model instead.
+
+
+```{r, echo=FALSE, message = FALSE}
+#### try to predict using post_strat data ####
+
+# retrieve calculations for proportions of each cell by indep. var
+
+gender_prop <- cleaned_data_strat_count %>%
+  ungroup() %>%
+  group_by(gender) %>%
+  mutate(prop = n/sum(n)) %>%
+  ungroup()
+
+race_prop <- cleaned_data_strat_count %>%
+  ungroup() %>%
+  group_by(race_ethnicity) %>%
+  mutate(prop = n/sum(n)) %>%
+  ungroup()
+
+region_prop <- cleaned_data_strat_count %>%
+  ungroup() %>%
+  group_by(state_name) %>%
+  mutate(prop = n/sum(n)) %>%
+  ungroup()
+
+income_prop <- cleaned_data_strat_count %>%
+  ungroup() %>%
+  group_by(household_income) %>%
+  mutate(prop = n/sum(n)) %>%
+  ungroup()
+
+age_prop <- cleaned_data_strat_count %>%
+  ungroup %>%
+  group_by(age_group) %>%
+  mutate(prop = n/sum(n)) %>%
+  ungroup()
+
+# predictions based on each variable
+
+# age
+age_pred <- data.frame(predict(log_fit_full, newdata = age_prop, type = "response"))
+colnames(age_pred) = "vote_pred"
+
+age_prop <- cbind(age_prop, age_pred)
+age_prop %>%
+  mutate (age_predict_prop = vote_pred*prop) %>%
+  group_by(age_group) %>%
+  summarise(vote_pred = sum(age_predict_prop)) %>%
+  summarise(mean = mean(vote_pred),
+            lower = quantile(vote_pred, 0.025),
+            higher = quantile(vote_pred, 0.975))
+
+# gender
+gender_pred <- data.frame(predict(log_fit_full, newdata = gender_prop, type = "response"))
+colnames(gender_pred) = "vote_pred"
+
+gender_prop <- cbind(gender_prop, gender_pred)
+gender_prop %>%
+  mutate (gender_predict_prop = vote_pred*prop) %>%
+  group_by(gender) %>%
+  summarise(vote_pred = sum(gender_predict_prop)) %>%
+  summarise(mean = mean(vote_pred),
+            lower = quantile(vote_pred, 0.025),
+            higher = quantile(vote_pred, 0.975))
+
+# race
+race_pred <- data.frame(predict(log_fit_full, newdata = race_prop, type = "response"))
+colnames(race_pred) = "vote_pred"
+
+race_prop <- cbind(race_prop, race_pred)
+race_prop %>%
+  mutate (race_predict_prop = vote_pred*prop) %>%
+  group_by(race_ethnicity) %>%
+  summarise(vote_pred = sum(race_predict_prop)) %>%
+  summarise(mean = mean(vote_pred),
+            lower = quantile(vote_pred, 0.025),
+            higher = quantile(vote_pred, 0.975))
+
+# region
+region_pred <- data.frame(predict(log_fit_full, newdata = region_prop, type = "response"))
+colnames(region_pred) = "vote_pred"
+
+region_prop <- cbind(region_prop, region_pred)
+region_prop %>%
+  mutate (region_predict_prop = vote_pred*prop) %>%
+  group_by(state_name) %>%
+  summarise(vote_pred = sum(region_predict_prop)) %>%
+  summarise(mean = mean(vote_pred),
+            lower = quantile(vote_pred, 0.025),
+            higher = quantile(vote_pred, 0.975))
+
+# income
+income_pred <- data.frame(predict(log_fit_full, newdata = income_prop, type = "response"))
+colnames(income_pred) = "vote_pred"
+
+income_prop <- cbind(income_prop, income_pred)
+income_prop %>%
+  mutate (income_predict_prop = vote_pred*prop) %>%
+  group_by(household_income) %>%
+  summarise(vote_pred = sum(income_predict_prop)) %>%
+  summarise(mean = mean(vote_pred),
+            lower = quantile(vote_pred, 0.025),
+            higher = quantile(vote_pred, 0.975))
+
+
+```
+
+
+
+# Results
+```{r popularvote, fig.cap="Visualization of Trump and Biden's expected vote in 100 people", echo=FALSE, message=FALSE, warning=FALSE}
+count<- tibble(vote=c("Trump", "Biden"), percent = c(42, 58))
+case_counts<- count$percent
+names(case_counts)<- count$vote
+waffle(case_counts, colors = c("lightcoral", "steelblue3"))
+```
+
+```{r statepred, fig.cap="Popular vote perdiction by State", echo =FALSE}
+state_prob<-region_prop %>%
+  mutate (region_predict_prop = vote_pred*prop) %>%
+  group_by(state_name) %>%
+  summarise(vote_pred = sum(region_predict_prop))
+
+names(state_prob)[1]<-"state"
+state_prob1<-state_prob%>%
+  mutate(vote = case_when(
+    vote_pred>0.5~"Trump",
+    vote_pred<=0.5~"Biden"
+  ))
+plot_usmap(data = state_prob1, values = "vote") + 
+  scale_fill_manual(name="Candidate", values = c("steelblue3", "lightcoral")) + 
+  theme(legend.position = "right")
+```
+
+
+```{r winningmargin, fig.cap= "Winning Margin for Trump and Republican Party by popular vote", warning=FALSE, echo=FALSE}
+plot_usmap(data = state_prob, values = "vote_pred") + 
+  scale_fill_continuous(low = "steelblue3", high="lightcoral", name = "Winning margin", label = scales::comma) + 
+  theme(legend.position = "right")
+
+```
+
+```{r agepred, fig.cap="Probability of vote by age", echo=FALSE}
+agepred<-tibble(age = c("18 to 29", "30 to 44", "45 to 59", "60+","18 to 29", "30 to 44", "45 to 59", "60+"), vote_prob = c(0.31, 0.41, 0.47, 0.44, 0.69, 0.58, 0.53, 0.56), vote = c("Trump", "Trump", "Trump","Trump", "Biden", "Biden", "Biden", "Biden"))
+
+ggplot(agepred, aes(x=age, y=vote_prob, fill = vote))+
+  geom_col()+
+  xlab("Age Group")+
+  ylab("Probability of being elected")+
+  geom_text(aes(label=vote_prob),position = position_stack(vjust = 0.5), color="white", size=3.5)+
+  scale_fill_manual(name = "Candidate", values=c("Biden"= "steelblue3","Trump"= "lightcoral"))
+
+```
+
+
+```{r genderpred, fig.cap="Probability of vote by gender", echo=FALSE}
+genderpred<-tibble(gender=c("Female", "Male", "Female", "Male"), vote_prob = c(0.39, 0.48, 0.61, 0.52), vote = c("Trump", "Trump", "Biden", "Biden"))
+
+
+ggplot(genderpred, aes(x=gender, y=vote_prob, fill = vote))+
+  geom_col()+
+  xlab("Gender")+
+  ylab("Probability of being elected")+
+  geom_text(aes(label=vote_prob),position = position_stack(vjust = 0.5), color="white", size=3.5)+
+  scale_fill_manual(name = "Candidate", values=c("Biden"= "steelblue3","Trump"= "lightcoral"))
+
+```
+
+
+```{r racepred, fig.cap="Probability of vote by race", echo=FALSE}
+racepred<-tibble(race = c("African American", "Asian(Chinese or Japanese)", "Native American", "Other Asian or Pacific Islander", "Others", "White", "African American", "Asian(Chinese or Japanese)", "Native American", "Other Asian or Pacific Islander", "Others", "White"), vote_prob=c(0.13,0.25,0.50, 0.42, 0.35, 0.54, 0.87, 0.75, 0.5, 0.58, 0.65, 0.46),vote = c("Trump", "Trump", "Trump","Trump", "Trump", "Trump", "Biden","Biden","Biden", "Biden", "Biden", "Biden"))
+
+ggplot(racepred, aes(x=factor(race, levels = c("African American", "Asian(Chinese or Japanese)","Others", "Other Asian or Pacific Islander", "Native American", "White")), y=vote_prob, fill = vote))+
+  geom_col()+
+  scale_x_discrete(labels = c("African \n American", "Asian \n (Chinese \n or Japanese)","Others", "Other Asian \n or Pacific Islander", "Native \n American", "White"))+
+  xlab("Race")+
+  ylab("Probability of being elected")+
+  geom_text(aes(label=vote_prob),position = position_stack(vjust = 0.5), color="white", size=3.5)+
+  scale_fill_manual(name = "Candidate", values=c("Biden"= "steelblue3","Trump"= "lightcoral"))
+
+```
+
+```{r incomepred, fig.cap="Probability of vote by income", echo=FALSE}
+incomepred<- tibble(income = c("$100,000 to $124,999", "$125,000 to $149,999", "$150,000 to $174,999", "$175,000 to $199,999", "$25,000 to $49,999", "$50,000 to $74,999", "$75,000 to $99,999", "Less than $24,999", "More than $200,000", "$100,000 to $124,999", "$125,000 to $149,999", "$150,000 to $174,999", "$175,000 to $199,999", "$25,000 to $49,999", "$50,000 to $74,999", "$75,000 to $99,999", "Less than $24,999", "More than $200,000"), vote_prob = c(0.45, 0.43, 0.37, 0.52, 0.41, 0.42, 0.39, 0.39, 0.53, 0.55, 0.57, 0.63, 0.48, 0.59, 0.58, 0.61, 0.61, 0.47), vote = c("Trump", "Trump", "Trump","Trump", "Trump", "Trump", "Trump", "Trump", "Trump", "Biden","Biden","Biden", "Biden","Biden","Biden", "Biden", "Biden", "Biden"))
+
+ggplot(incomepred, aes(x=factor(income, levels = c("Less than $24,999", "$25,000 to $49,999", "$50,000 to $74,999", "$75,000 to $99,999","$100,000 to $124,999", "$125,000 to $149,999", "$150,000 to $174,999", "$175,000 to $199,999","More than $200,000")), y=vote_prob, fill = vote))+
+  geom_col()+
+  xlab("Household Income")+
+  ylab("Probability of being elected")+
+  geom_text(aes(label=vote_prob),position = position_stack(vjust = 0.5), color="white", size=3.5)+
+  scale_x_discrete(labels = c("Less \n than \n $24,999", "$25,000 \n to \n $49,999", "$50,000 \n to \n $74,999", "$75,000 \n to \n $99,999","$100,000 \n to \n $124,999", "$125,000 \n to \n $149,999", "$150,000 \n to \n $174,999", "$175,000 \n to \n $199,999","More \n than \n $200,000"))+
+  scale_fill_manual(name = "Candidate", values=c("Biden"= "steelblue3","Trump"= "lightcoral"))
+```
+
+\newpage
+
+# Discussion
+From the model, we are able to predict that biden is likely to win the popular vote by 16.32%. Figure \@ref(fig:popularvote) gives us a general understanding of the popularity of two candidates. It demonstrates that in every 100 people, 58 people are likely biased towards voting for Biden. 
+
+In Figure \@ref(fig:statepred) and Figure \@ref(fig:winningmargin), we have further demonstrated the predicted result of popular vote. Comparing the result in Figure \@ref(fig:statepred) to Figure \@red(fig:state), we have found that Iowa is the only state that changed its candidate after modelling. In the raw data, Trump has the popular vote in the state of Iowa, however, Biden has replaced the position. This gives us more confidence in Biden's popularity. Figure \@ref(fig:winningmargin) is an important graph, serving its significance by providing us the details of the winning margin. While red is represented by Trump’s Republican Party, and blue is Biden and his Democratic Party, the graph indicates how much of the popular vote they are likely to win in each state. For example, Vermont shows the darkest blue, meaning it is confident that Biden is expected to receive the popular vote in Vermont. And Idaho shows the brightest red, indicating the probability of Trump winning the popular vote in Idaho is higher than other stats. 
+
+With regards to the impact of the variables, it comes with little surprise that race(Figure \@ref(fig:racepred)) has a significant impact on one's choice of presidential candidate. Certain races such as African Americans and Asians (Chinese or Japanese) demonstrate very strong preferences towards Joe Biden. With the multitude of incidents that have occured over the current American president’s term with relation to race, it is fitting to assume that many people of certain races might hold stronger feelings of dissatisfaction with Trump. Similar incidents have also occurred around gender(Figure \@ref(fig:genderpred)) which makes the result where women show a stronger preference towards Biden unsurprising.
+
+Moreover, another unsurprising outcome was that younger people have a stronger preference for Biden with regards to older age groups. Many of the younger generation are concerned with issues such as climate change, and racial and economic injustice (\@cite_youth_poll). Many of the outcomes reflect the current sentiments of the public surrounding the current political climate and POTUS. A surprising outcome however, our predictions showed that income did not have a large impact on one’s choice of presidential candidate despite their different approaches towards income tax being a subject of much debate. Our final model predicted that Biden wins with 58.16% of the votes. 
+
+By understanding the model and results, we can infer that a person’s demographic information can have a significant impact on their preference of presidential candidate. This could be the result of certain policies being more beneficial towards certain demographics. Moreover, we can also reasonably draw the conclusion that comments made by politicians who receive much attention are remembered by the public. Their remarks, regardless of negative or not, are interpreted as indications towards their integrity and highly unlikely to be forgotten.
+
+However, a caveat worth mentioning is that there was little consideration towards the electoral colleges, which is a large part of the American election. Moreover, it should be kept in mind that our model and predictions are very much contained in a small world. There can be many surprises in the large world of reality, where many surprising events can occur. This is further emphasized by how one’s choice of presidential candidate is influenced by but not entirely determined by just a few demographic factors. There are many variances in how one perceives certain political policies such as the American government's methods of handling of the second wave of Covid19, which occurred months after the survey data was collected.
+
+
+## Weaknesses and Future Work
+This paper suggests that Biden is expected to win by popular vote. However, some factors may take account to weaken the result. 
+First of all, some limitations arise from the survey results. Our individual level survey from Democracy Fund + UCLA Nationscape uses an online portal to conduct non-probability quota surveys. Which may result in selection bias and non-response bias. Secondly, we have used the 2018 American Community Survey as post-stratification data. The survey is conducted every two years, meaning we have no access to the most recent data. Some factors such income, or political stance might have changed given recent circumstances. Thus 2020 ACS would provide more accurate information if used. 
+Upon modelling, the data has shown some more limitations. We have chosen to use a binary logistic regression with  age, gender, income, state, and race as variables. However, due to the nature of two datasets, we are forced upon dropping or changing some valuable observations/variables. For example, racial groups are significantly different in the two datasets. We have to separate Chinese and Japanese, while other Asians are grouped together with Pacific Islanders to match the names. This may result in some inaccuracy of vote intentions by race. Moreover, ACS data does not include some factors such as 2016 vote history, which could potentially be a strong predictor of the 2020 election. In addition, a Bayesian binary regression model was our first choice of modeling, which may provide a more accurate result. However, due to excessively long run time and multiple crashes, we are forced to change it into logistic regression due to computational limitation. 
+Another major limitation that directly impacts our result is that the result does not take accountability of people who would not vote. Our result simply demonstrates that among all registered votes, Biden’s is likely to be 58.16% of them. If a significant number of people choose not to vote in this election, the difference between Biden and Trump’s expected vote will be lessened. 
+Despite the weakness mentioned above, this paper serves its purpose of predicting the election by popular vote. We are able to predict our result with a 95% confidence interval. Some future studies may be done with the addition of Bayesian to improve the accuracy. In addition, this paper can be reproduced as a forecast for other elections such as provincial elections. 
+
+
+# Appendix
+1. Simple ranking technique is to weight the criteria by rank in ascending/descending order. Ascending order means that the most important criteria is giving rank 1, vise versa. Upon assigning the ranks, the attributes are then weighted by the numerical weights corresponding to the ranks(@cite_weighting). Simple ranking techniques are the more cost/time efficient way of ranking, yet drawbacks exist and are discussed.
+
+# References
+
