@@ -198,20 +198,38 @@ reduced_data_18 <- reduced_data_18 %>% mutate(region = ifelse(state %in% northea
 cleaned_data_strat <- 
   reduced_data_18 %>% 
   dplyr::select(gender, 
+         state,
          region,
          ages,
          race_ethnicity, 
-         is_hispanic,
-         foreign_born,
-         education,
-         employment,
          household_income)
+
+age_pie <- ggplot(cleaned_data_strat, aes(x=factor(1), fill=age))+
+  geom_bar(width = 1)+
+  coord_polar("y")
+
+gender_pie <- ggplot(cleaned_data_strat, aes(x=factor(1), fill=gender))+
+  geom_bar(width = 1)+
+  coord_polar("y")
+
+state_pie <- ggplot(cleaned_data_strat, aes(x=factor(1), fill=state))+
+  geom_bar(width = 1)+
+  coord_polar("y")
+
+race_pie <- ggplot(cleaned_data_strat, aes(x=factor(1), fill=race_ethnicity))+
+  geom_bar(width = 1)+
+  coord_polar("y")
+
+income_pie <- ggplot(cleaned_data_strat, aes(x=factor(1), fill=household_income))+
+  geom_bar(width = 1)+
+  coord_polar("y") 
+
 
 cleaned_data_strat <- rename(cleaned_data_strat, age_group = ages)
 cleaned_data_strat <- rename(cleaned_data_strat, census_region = region)
 cleaned_data_strat_count <- cleaned_data_strat %>%
   group_by(gender, 
-           age_group,
+           ages,
            household_income,
            race_ethnicity,
            census_region
