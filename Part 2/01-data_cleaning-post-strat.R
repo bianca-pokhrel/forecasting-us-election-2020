@@ -148,10 +148,10 @@ reduced_data_18 <- reduced_data_18 %>% mutate(education = case_when(
 #(is.na(educd) | educd %in% less_educ)
 
 # New col -> age group
-reduced_data_18 <- reduced_data_18 %>% mutate(ages = case_when(as.numeric(age) < 30 ~ "Ages 18 to 29",
-                                                                    (30 <= as.numeric(age) & as.numeric(age) < 45) ~ "Ages 30 to 44",
-                                                                    (45 <= as.numeric(age) & as.numeric(age) < 60) ~ "Ages 45 to 59",
-                                                                    TRUE ~ "Ages 60+"))
+reduced_data_18 <- reduced_data_18 %>% mutate(ages = case_when(as.numeric(age) < 30 ~ "18 to 29",
+                                                                    (30 <= as.numeric(age) & as.numeric(age) < 45) ~ "30 to 44",
+                                                                    (45 <= as.numeric(age) & as.numeric(age) < 60) ~ "45 to 59",
+                                                                    TRUE ~ "60+"))
 
 # Hispanic->
 unique(reduced_data_18$hispan)
