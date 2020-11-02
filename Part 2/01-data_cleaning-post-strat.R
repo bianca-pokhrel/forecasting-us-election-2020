@@ -119,7 +119,7 @@ unique(reduced_data_18$ftotinc)
 
 reduced_data_18 <- reduced_data_18 %>% mutate(household_income = case_when(
   ftotinc <= 24999 ~ "Less than $24,999",
-  (24999 < ftotinc & ftotinc <= 49999) ~ "$25,000 t0 $49,999",
+  (24999 < ftotinc & ftotinc <= 49999) ~ "$25,000 to $49,999",
   (49999 < ftotinc & ftotinc <= 74999) ~ "$50,000 to $74,999",
   (74999 < ftotinc & ftotinc <= 99999) ~ "$75,000 to $99,999",
   (99999 < ftotinc & ftotinc <= 124999) ~ "$100,000 to $124,999",
