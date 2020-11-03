@@ -1,7 +1,7 @@
 # Binary Logistic Regression Model: Joe Biden predicted to win by popular vote
 Analysis and Prediction of the US 2020 Elections (STA304)
 
-Writeup pdf is located in Writeup.pdf.
+Writeup pdf is located in PS4.pdf.
 Rmd file used to knit this report is in PS4.Rmd
 
 
